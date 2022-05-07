@@ -16,10 +16,21 @@ def getDataFromMesh(meshPath):
     vertexs = (vertexs * 2) - 1
 
     vertexs = vertexs.flatten().tolist()
-    cells = mesh.cells_dict['triangle'].flatten().tolist()
+    if "triangle" in mesh.cells_dict.keys():
+        cells = mesh.cells_dict['triangle'].flatten().tolist()
+        meshType = "triangle" 
+    elif "polygon" in mesh.cells_dict.keys():
+        cells = mesh.cells_dict['polygon'].flatten().tolist()
+        meshType = "line"
+    elif "line" in mesh.cells_dict.keys():
+        cells = mesh.cells_dict['line'].flatten().tolist()
+        meshType = "line"
+    else: 
+        raise ValueError("Only triangles or lines are accepted")
+    
     normals = mesh.point_data['obj:vn'].flatten().tolist()
-    return vertexs, cells, normals
-
+    return vertexs, cells, normals, meshType
+    
 def createUniqueName(name):
     today = datetime.datetime.now()
     date_time = today.strftime("%d-%m-%Y__%H-%M-%S")
@@ -39,8 +50,8 @@ def index(request):
             uniqueName = createUniqueName(uploadedFile.name)
             fs.save(uniqueName, uploadedFile)
             context['url'] = fs.url(uniqueName)
-            vertexs, cells, normals = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
-            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals}
+            vertexs, cells, normals, meshType = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
+            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType}
             context ['data'] = data
 
     else:

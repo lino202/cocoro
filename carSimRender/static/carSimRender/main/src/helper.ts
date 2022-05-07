@@ -1,10 +1,12 @@
 import { vec3, mat4 } from "gl-matrix";
+import { AddColors } from "./colorMap";
 
 export const getDataFromDjango = (data:any) =>{
     const vertexs = new Float32Array(data.vertexs)
     const indexs = new Uint32Array(data.cells)
-    const normals = new Float32Array(data.normals)
-    return {vertexs,indexs, normals}
+    const normals = new Float32Array(data.normals);
+    const meshType = data.meshType;
+    return {vertexs,indexs, normals, meshType};
 }
 
 export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0), isAnimation = true ) => {
@@ -21,6 +23,9 @@ export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0)
     }
     requestAnimationFrame(step);
 }
+
+
+
 
 export const createTransforms = (modelMat:mat4, translation:vec3 = [0,0,0], rotation:vec3 = [0,0,0], scaling:vec3 = [1,1,1]) => {
     const rotateXMat = mat4.create();
@@ -130,6 +135,22 @@ export const initGPU = async () => {
     return{device, canvas, format, context};
 
 }
+
+export const GetColorFromVertexs = (vertexs:Float32Array) => {
+
+
+    let colors: any = [];
+    for (let i=2; i<vertexs.length;i=i+3){
+        colors.push(AddColors('jet',-1,1,vertexs[i]));
+    }
+
+
+    return new Float32Array(colors.flat());
+    
+
+
+}
+
 
 
 export const checkWebGPU = () => {

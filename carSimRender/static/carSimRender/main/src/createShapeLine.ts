@@ -1,20 +1,13 @@
-import { initGPU, createGPUBuffer, createTransforms, createViewProjection, checkWebGPU, createAnimation,getDataFromDjango, createGPUBufferUint } from './helper';
+import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from './helper';
+import {createAnimation, createGPUBufferUint } from './helper';
+import { LightInputs } from './mysettings';
 import Shaders from './shaders.wgsl';
 import { mat4, vec3 } from 'gl-matrix';
+
 const createCamera =require('3d-view-controls')
 
-// Light model parameters
-export interface LightInputs {
-    color?: string;
-    ambientIntensity?: string;
-    diffuseIntensity?: string;
-    specularIntensity?: string;
-    shininess?: string;
-    specularColor?: string;
-} 
-
-
-export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAnimation = false) => {
+export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, colorData:Float32Array, li:LightInputs, isAnimation = false) => {
+    console.log("RENDERING LINE");
     const gpu = await initGPU();
     const device = gpu.device;
 
@@ -25,13 +18,14 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
     li.specularIntensity = li.specularIntensity == undefined ? '0.2' : li.specularIntensity;
     li.shininess = li.shininess == undefined ? '30.0' : li.shininess;
     li.specularColor = li.specularColor == undefined ? '1.0, 1.0, 1.0' : li.specularColor;
+    li.isTwoSideLighting = li.isTwoSideLighting == undefined ? '1.0' : li.isTwoSideLighting;
 
     // create vertex buffers
-    const meshData = getDataFromDjango(djangodata);
-    const numberOfVertices = meshData.indexs.length;
-    const vertexBuffer = createGPUBuffer(device, meshData.vertexs);
-    const normalBuffer = createGPUBuffer(device, meshData.normals);
-    const indexBuffer = createGPUBufferUint(device, meshData.indexs);
+    const numberOfVertices = indexs.length;
+    const vertexBuffer = createGPUBuffer(device, vertexs);
+    const normalBuffer = createGPUBuffer(device, normals);
+    const colorBuffer = createGPUBuffer(device, colorData);
+    const indexBuffer = createGPUBufferUint(device, indexs);
  
 
     const pipeline = device.createRenderPipeline({
@@ -53,11 +47,23 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
                 },
                 {
                     arrayStride: 12,
-                    attributes: [{
-                        shaderLocation: 1,
-                        format: "float32x3",
-                        offset: 0
-                    }]
+                    attributes: [
+                        {
+                            shaderLocation: 1,
+                            format: "float32x3",
+                            offset: 0
+                        }
+                    ]
+                },
+                {
+                    arrayStride: 12,
+                    attributes: [
+                        {
+                            shaderLocation: 2,
+                            format: "float32x3",
+                            offset: 0
+                        }
+                    ]
                 }
             ]
         },
@@ -73,7 +79,7 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
             ]
         },
         primitive:{
-            topology: "triangle-list",
+            topology: "line-list",
             // cullMode: 'back' No se que es
         },
         depthStencil:{
@@ -115,7 +121,7 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
     });
 
     const lightUniformBuffer = device.createBuffer({    
-        size: 16,
+        size: 20,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
 
@@ -128,6 +134,7 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
         parseFloat(li.diffuseIntensity?.toString()!),
         parseFloat(li.specularIntensity?.toString()!),
         parseFloat(li.shininess?.toString()!),
+        parseFloat(li.isTwoSideLighting?.toString()!),
     ]);
     device.queue.writeBuffer(lightUniformBuffer, 0, lightParams);
 
@@ -163,7 +170,7 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
                 resource: {
                     buffer: lightUniformBuffer,
                     offset: 0,
-                    size: 16
+                    size: 20
                 }
             }               
         ]
@@ -178,14 +185,17 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
     const renderPassDescription = {
         colorAttachments: [{
             view: textureView,
-            loadValue: { r: 0.5, g: 0.5, b: 0.8, a: 1.0 }, //background color
-            storeOp: 'store'
+            clearValue: { r: 0.5, g: 0.5, b: 0.8, a: 1.0 }, //background color
+            loadOp: "clear",
+            storeOp: "store"
         }],
         depthStencilAttachment: {
             view: depthTexture.createView(),
-            depthLoadValue: 1.0,
+            depthClearValue: 1.0,
+            depthLoadOp: "clear",
             depthStoreOp: "store",
-            stencilLoadValue: 0,
+            stencilClearValue: 0,
+            stencilLoadOp: "clear",
             stencilStoreOp: "store"
         }
     };
@@ -205,10 +215,6 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
         }
         
         
-        // createTransforms(modelMatrix,[0,0,0], rotation);
-        // mat4.multiply(mvpMatrix, vpMatrix, modelMatrix);
-        // device.queue.writeBuffer(uniformBuffer, 0, mvpMatrix as ArrayBuffer);
-        
         createTransforms(modelMatrix,[0,0,0], rotation);
         mat4.invert(normalMatrix, modelMatrix);
         mat4.transpose(normalMatrix, normalMatrix);
@@ -224,10 +230,11 @@ export const CreateShapeWithLight = async (djangodata:any, li:LightInputs, isAni
         renderPass.setPipeline(pipeline);
         renderPass.setVertexBuffer(0, vertexBuffer);
         renderPass.setVertexBuffer(1, normalBuffer);
+        renderPass.setVertexBuffer(2, colorBuffer);
         renderPass.setIndexBuffer(indexBuffer, 'uint32');
         renderPass.setBindGroup(0, uniformBindGroup);
         renderPass.drawIndexed(numberOfVertices);
-        renderPass.endPass();
+        renderPass.end();
 
         device.queue.submit([commandEncoder.finish()]);
     }

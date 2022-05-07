@@ -1,0 +1,10 @@
+name: carsim
+channels:
+  - defaults
+dependencies:
+  - python
+  - nodejs
+  - django
+  - typescript
+  - meshio
+prefix: C:\Users\usuario\anaconda3\envs\carsim

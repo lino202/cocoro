@@ -10,15 +10,17 @@ struct Output {
     @builtin(position) Position : vec4<f32>;
     @location(0) vPosition : vec4<f32>;
     @location(1) vNormal : vec4<f32>;
+    @location(2) vColor : vec3<f32>;
 };
 
 @stage(vertex)
-fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>) -> Output {    
+fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>, @location(2) color: vec3<f32>) -> Output {    
     var output: Output;            
     let mPosition:vec4<f32> = vertex_uniforms.modelMatrix * position; 
     output.vPosition = mPosition;                  
     output.vNormal =  vertex_uniforms.normalMatrix*normal;
     output.Position = vertex_uniforms.viewProjectionMatrix * mPosition;               
+    output.vColor = color;
     return output;
 }
 
@@ -42,12 +44,13 @@ struct LightUniforms{
     diffuseIntensity : f32;
     specularIntensity : f32;
     shininess : f32;
+    twoSide : f32;
 };
 @binding(3) @group(0) var <uniform> light_uniforms : LightUniforms;
 
 
 @stage(fragment)
-fn fs_main (@location(0) vPosition: vec4<f32>, @location(1) vNormal: vec4<f32>) ->  @location(0) vec4<f32> {
+fn fs_main (@location(0) vPosition: vec4<f32>, @location(1) vNormal: vec4<f32>, @location(2) vColor: vec3<f32>) ->  @location(0) vec4<f32> {
     let N:vec3<f32> = normalize(vNormal.xyz);                
     let L:vec3<f32> = normalize(frag_uniforms.lightPosition.xyz - vPosition.xyz);     
     let V:vec3<f32> = normalize(frag_uniforms.eyePosition.xyz - vPosition.xyz);          
@@ -55,7 +58,8 @@ fn fs_main (@location(0) vPosition: vec4<f32>, @location(1) vNormal: vec4<f32>) 
     let diffuse:f32 = light_uniforms.diffuseIntensity * max(dot(N, L), 0.0);
     var specular:f32;
     specular = light_uniforms.specularIntensity * pow(max(dot(N, H),0.0), light_uniforms.shininess);
+    if(light_uniforms.twoSide == 1.0){   specular = specular + light_uniforms.specularIntensity * pow(max(dot(-N, H),0.0), light_uniforms.shininess);  }
     let ambient:f32 = light_uniforms.ambientIntensity;               
-    let finalColor:vec3<f32> = color_uniforms.lightColor.xyz*(ambient + diffuse) + color_uniforms.specularColor.xyz*specular; 
+    let finalColor:vec3<f32> = vColor*(ambient + diffuse) + color_uniforms.specularColor.xyz*specular; 
     return vec4<f32>(finalColor, 1.0);
 }

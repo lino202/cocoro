@@ -15,12 +15,11 @@
 
    <h2 id="id-gpu-check"></h2><br><br>
 
-
    <div>
       <form enctype="multipart/form-data" method="post">
          {% csrf_token %}
          {{ form }}  
-         <button type="submit"> Upload Mesh</button>
+         <button type="submit"  id='btn-uploadMesh'> Upload Mesh</button>
      </form>
  
      {%if url%}
