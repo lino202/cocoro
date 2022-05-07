@@ -194,9 +194,9 @@ export const CreateSurf = async (vertexs:Float32Array, normals:Float32Array, ind
             depthClearValue: 1.0,
             depthLoadOp: "clear",
             depthStoreOp: "store",
-            stencilClearValue: 0,
-            stencilLoadOp: "clear",
-            stencilStoreOp: "store"
+            // stencilClearValue: 0,
+            // stencilLoadOp: "clear",
+            // stencilStoreOp: "store"
         }
     };
     
