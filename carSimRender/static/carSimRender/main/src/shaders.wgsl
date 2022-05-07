@@ -1,16 +1,16 @@
 // vertex shader
 struct VertexUniforms {
-    viewProjectionMatrix : mat4x4<f32>;
-    modelMatrix : mat4x4<f32>;               
-    normalMatrix : mat4x4<f32>;            
+    viewProjectionMatrix : mat4x4<f32>,
+    modelMatrix : mat4x4<f32>,               
+    normalMatrix : mat4x4<f32>,            
 };
 @binding(0) @group(0) var<uniform> vertex_uniforms : VertexUniforms;
 
 struct Output {
-    @builtin(position) Position : vec4<f32>;
-    @location(0) vPosition : vec4<f32>;
-    @location(1) vNormal : vec4<f32>;
-    @location(2) vColor : vec3<f32>;
+    @builtin(position) Position : vec4<f32>,
+    @location(0) vPosition : vec4<f32>,
+    @location(1) vNormal : vec4<f32>,
+    @location(2) vColor : vec3<f32>,
 };
 
 @stage(vertex)
@@ -26,25 +26,25 @@ fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>, @l
 
 // fragment shader
 struct FragUniforms {
-    lightPosition : vec4<f32>;   
-    eyePosition : vec4<f32>;
+    lightPosition : vec4<f32>,   
+    eyePosition : vec4<f32>,
 };
 @binding(1) @group(0) var<uniform> frag_uniforms : FragUniforms;
 
 
 struct ColorUniforms{
-    lightColor : vec4<f32>;     //f32 son 4 bytes asignados a cada elemento
-    specularColor : vec4<f32>;
+    lightColor : vec4<f32>,     //f32 son 4 bytes asignados a cada elemento
+    specularColor : vec4<f32>,
 };
 @binding(2) @group(0) var <uniform> color_uniforms : ColorUniforms;
 
 
 struct LightUniforms{
-    ambientIntensity : f32;
-    diffuseIntensity : f32;
-    specularIntensity : f32;
-    shininess : f32;
-    twoSide : f32;
+    ambientIntensity : f32,
+    diffuseIntensity : f32,
+    specularIntensity : f32,
+    shininess : f32,
+    twoSide : f32,
 };
 @binding(3) @group(0) var <uniform> light_uniforms : LightUniforms;
 

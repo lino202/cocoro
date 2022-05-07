@@ -120,6 +120,6 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
-MEDIA_ROOT = 'D://tmp/django/media/'
+MEDIA_ROOT = '/tmp/django/media/'
 
 MEDIA_URL = '/media/'
