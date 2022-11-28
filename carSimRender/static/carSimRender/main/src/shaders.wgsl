@@ -13,7 +13,7 @@ struct Output {
     @location(2) vColor : vec3<f32>,
 };
 
-@stage(vertex)
+@vertex
 fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>, @location(2) color: vec3<f32>) -> Output {    
     var output: Output;            
     let mPosition:vec4<f32> = vertex_uniforms.modelMatrix * position; 
@@ -49,7 +49,7 @@ struct LightUniforms{
 @binding(3) @group(0) var <uniform> light_uniforms : LightUniforms;
 
 
-@stage(fragment)
+@fragment
 fn fs_main (@location(0) vPosition: vec4<f32>, @location(1) vNormal: vec4<f32>, @location(2) vColor: vec3<f32>) ->  @location(0) vec4<f32> {
     let N:vec3<f32> = normalize(vNormal.xyz);                
     let L:vec3<f32> = normalize(frag_uniforms.lightPosition.xyz - vPosition.xyz);     
