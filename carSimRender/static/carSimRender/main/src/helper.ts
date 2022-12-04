@@ -112,27 +112,27 @@ export const initGPU = async () => {
     }
 
     const canvas = document.getElementById('canvas-webgpu') as HTMLCanvasElement;
-    const adapter = await navigator.gpu?.requestAdapter() as GPUAdapter;
-    const device = await adapter?.requestDevice() as GPUDevice;
+    const adapter = await navigator.gpu.requestAdapter() as GPUAdapter;
+    const device = await adapter.requestDevice() as GPUDevice;
     const context = canvas.getContext('webgpu') as unknown as GPUCanvasContext;
-
     const devicePixelRatio = window.devicePixelRatio || 1;
-    const size = [
-        canvas.clientWidth * devicePixelRatio,
-        canvas.clientHeight * devicePixelRatio,
+    // const size = [
+    //     canvas.clientWidth * devicePixelRatio,
+    //     canvas.clientHeight * devicePixelRatio,
 
-    ];
+    // ];
+    canvas.width = canvas.clientWidth * devicePixelRatio
+    canvas.height = canvas.clientHeight * devicePixelRatio
 
-    const format = context.getPreferredFormat(adapter!);
-
-
+    const textureFormat = await navigator.gpu.getPreferredCanvasFormat()
+    // const format = context.getPreferredFormat(adapter!);
     context.configure({
         device: device,
-        format: format,
-        size: size
+        format: textureFormat,
+        alphaMode: "premultiplied"
     })
 
-    return{device, canvas, format, context};
+    return{device, canvas, textureFormat, context};
 
 }
 

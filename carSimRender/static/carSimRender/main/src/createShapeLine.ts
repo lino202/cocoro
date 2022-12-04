@@ -26,9 +26,34 @@ export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, ind
     const normalBuffer = createGPUBuffer(device, normals);
     const colorBuffer = createGPUBuffer(device, colorData);
     const indexBuffer = createGPUBufferUint(device, indexs);
+
+    const bindGroupLayout = device.createBindGroupLayout({
+        entries: [{
+            binding: 0,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+            buffer: {}
+        }, {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: {}
+        }, {
+            binding: 2,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: {}
+        },{
+            binding: 3,
+            visibility: GPUShaderStage.FRAGMENT,
+            buffer: {}
+        }]
+    });
+
+    const pipelineLayout = device.createPipelineLayout({
+        bindGroupLayouts: [bindGroupLayout]
+    });
  
 
     const pipeline = device.createRenderPipeline({
+        layout: pipelineLayout,
         vertex: {
             module: device.createShaderModule({                    
                 code: Shaders
@@ -74,7 +99,7 @@ export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, ind
             entryPoint: "fs_main",
             targets: [
                 {
-                    format: gpu.format as GPUTextureFormat
+                    format: gpu.textureFormat as GPUTextureFormat
                 }
             ]
         },
@@ -139,7 +164,7 @@ export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, ind
     device.queue.writeBuffer(lightUniformBuffer, 0, lightParams);
 
     const uniformBindGroup = device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
+        layout: bindGroupLayout,
         entries: [
             {
                 binding: 0,
