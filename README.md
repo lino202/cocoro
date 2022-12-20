@@ -3,8 +3,20 @@
 Simulations in the GPU throught the web.
 
 
-# Usage 
+# Usage
 
+For now it is working in chrome canary on windows only and in my case I have to set msi pc dragon center to use the discrete gpu
+
+# Install 
+
+   ```sh
+   cd /parent/folder
+   git clone https://github.com/lino202/carSim
+   cd carSim
+   cd carSimRender/static/carSimRender/main/
+   npm install
+   npm run prod
+   ```
 
 ## Load server
 

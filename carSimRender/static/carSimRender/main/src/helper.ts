@@ -25,8 +25,6 @@ export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0)
 }
 
 
-
-
 export const createTransforms = (modelMat:mat4, translation:vec3 = [0,0,0], rotation:vec3 = [0,0,0], scaling:vec3 = [1,1,1]) => {
     const rotateXMat = mat4.create();
     const rotateYMat = mat4.create();
@@ -112,7 +110,11 @@ export const initGPU = async () => {
     }
 
     const canvas = document.getElementById('canvas-webgpu') as HTMLCanvasElement;
-    const adapter = await navigator.gpu.requestAdapter() as GPUAdapter;
+    // const adapter = await navigator.gpu.requestAdapter() as GPUAdapter;
+
+    const adapter = await navigator.gpu.requestAdapter({
+        powerPreference: 'high-performance'
+    }) as GPUAdapter;
     const device = await adapter.requestDevice() as GPUDevice;
     const context = canvas.getContext('webgpu') as unknown as GPUCanvasContext;
     const devicePixelRatio = window.devicePixelRatio || 1;
