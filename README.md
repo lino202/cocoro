@@ -49,6 +49,5 @@ We can use the types of for web gpu but the compilation with npm run prod gives 
 
 Those should be used where the packaje.json is...
 
-Today the warnings are only [warnings](./images/problems_28_11_22.PNG) but the new realease of 1.23 of types has to be used in the near future.
 
 
