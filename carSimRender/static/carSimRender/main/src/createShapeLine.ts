@@ -1,12 +1,12 @@
 import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from './helper';
 import {createAnimation, createGPUBufferUint } from './helper';
-import { LightInputs } from './mysettings';
+import { LightInputsInterface } from './mysettings';
 import Shaders from './shaders.wgsl';
 import { mat4, vec3 } from 'gl-matrix';
 
 const createCamera =require('3d-view-controls')
 
-export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, colorData:Float32Array, li:LightInputs, isAnimation = false) => {
+export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, colorData:Float32Array, li:LightInputsInterface, isAnimation = false) => {
     console.log("RENDERING LINE");
     const gpu = await initGPU();
     const device = gpu.device;
@@ -26,34 +26,9 @@ export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, ind
     const normalBuffer = createGPUBuffer(device, normals);
     const colorBuffer = createGPUBuffer(device, colorData);
     const indexBuffer = createGPUBufferUint(device, indexs);
-
-    const bindGroupLayout = device.createBindGroupLayout({
-        entries: [{
-            binding: 0,
-            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
-            buffer: {}
-        }, {
-            binding: 1,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {}
-        }, {
-            binding: 2,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {}
-        },{
-            binding: 3,
-            visibility: GPUShaderStage.FRAGMENT,
-            buffer: {}
-        }]
-    });
-
-    const pipelineLayout = device.createPipelineLayout({
-        bindGroupLayouts: [bindGroupLayout]
-    });
  
-
     const pipeline = device.createRenderPipeline({
-        layout: pipelineLayout,
+        layout: 'auto',
         vertex: {
             module: device.createShaderModule({                    
                 code: Shaders
@@ -164,7 +139,7 @@ export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, ind
     device.queue.writeBuffer(lightUniformBuffer, 0, lightParams);
 
     const uniformBindGroup = device.createBindGroup({
-        layout: bindGroupLayout,
+        layout: pipeline.getBindGroupLayout(0),
         entries: [
             {
                 binding: 0,

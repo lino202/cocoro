@@ -5,8 +5,10 @@ export const getDataFromDjango = (data:any) =>{
     const vertexs = new Float32Array(data.vertexs)
     const indexs = new Uint32Array(data.cells)
     const normals = new Float32Array(data.normals);
+    const voiInitValues = new Float32Array(data.voiInitValues);
+    const stimParams = new Float32Array(data.stimParams);
     const meshType = data.meshType;
-    return {vertexs,indexs, normals, meshType};
+    return {vertexs, indexs, normals, meshType, voiInitValues, stimParams};
 }
 
 export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0), isAnimation = true ) => {
@@ -100,8 +102,6 @@ export const createGPUBuffer = (device:GPUDevice, data:Float32Array,
 
 }
 
-
-
 export const initGPU = async () => {
     const checkgpu = checkWebGPU();
     if(checkgpu.includes("Your current browser does not support WebGPU! :(")){
@@ -138,22 +138,14 @@ export const initGPU = async () => {
 
 }
 
+// This function gets the color map based on the z axis in the node positions
 export const GetColorFromVertexs = (vertexs:Float32Array) => {
-
-
     let colors: any = [];
     for (let i=2; i<vertexs.length;i=i+3){
         colors.push(AddColors('jet',-1,1,vertexs[i]));
     }
-
-
     return new Float32Array(colors.flat());
-    
-
-
 }
-
-
 
 export const checkWebGPU = () => {
     let result = "Great, your current browser supports WebGPU!";

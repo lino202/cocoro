@@ -1,5 +1,5 @@
 // Light model parameters
-export interface LightInputs {
+export interface LightInputsInterface {
     color?: string;
     ambientIntensity?: string;
     diffuseIntensity?: string;
