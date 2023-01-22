@@ -8,6 +8,27 @@ import os
 import numpy as np
 import datetime
 import copy
+from scipy.spatial import KDTree
+
+
+def getregQuadFDrelations(points):
+    thres = np.unique(np.abs(np.diff(points,axis=0)))[1]
+    thres = np.sqrt(2*thres**2) - 1e-6
+    print("Threshold used for the search in getregQuadFDrelations {}".format(thres))
+    tree = KDTree(points)
+    res = tree.query_ball_point(points, thres - 1e-6)
+    resArr = np.zeros((res.shape[0],4))
+    for i in range(len(res)):
+        res[i].remove(i)
+        if len(res[i]) > 4: raise ValueError("Wrong threshold, more than 4 neighs where found, point {}".format(i))
+        if len(res[i])!=4:
+            resArr[i] = [-1, -1, -1, -1]
+        else:
+            resArr[i] = res[i]
+    return resArr
+    # rbmVersors = rbmVersors[idxs,:]
+    # angles = angles[idxs]
+
 
 def getDataFromMesh(meshPath):
     mesh = meshio.read(meshPath)
@@ -18,43 +39,52 @@ def getDataFromMesh(meshPath):
     norm = np.max(mesh.points, axis=0) - np.min(mesh.points, axis=0)
     vertexs = np.divide(vertexs, norm, where=norm!=0)
     vertexs = (vertexs * 2) - 1
-    vertexs = vertexs.flatten().tolist()
     
     #Get cells, obj files cannot have line elems so 1D should be pass as .vtk
-    if "triangle" in mesh.cells_dict.keys():
-        cells = mesh.cells_dict['triangle'].flatten().tolist()
+    if "triangle" in mesh.cells_dict.keys():   
+        cells = mesh.cells_dict['triangle']
         meshType = "triangle" 
     elif "polygon" in mesh.cells_dict.keys():
-        cells = mesh.cells_dict['polygon'].flatten().tolist()
+        cells = mesh.cells_dict['polygon']
         meshType = "line"
     elif "line" in mesh.cells_dict.keys():
-        cells = mesh.cells_dict['line'].flatten().tolist()
+        cells = mesh.cells_dict['line']
         meshType = "line"
     else: 
         raise ValueError("Only triangles or lines are accepted")
     
-    #Get normals 
+    #Get normals
+    normals = np.zeros((mesh.points.shape[0],3))
     for key in mesh.point_data.keys():
         if 'vn' in key:
-            normals = mesh.point_data[key].flatten().tolist()
+            normals = mesh.point_data[key]
             break
 
     #Get init Values for Voi
     voiInitValues = np.zeros(mesh.points.shape[0])
-    voiInitValues = voiInitValues.flatten().tolist()
     
-    #Get stim params from .vtk point data
-    stimParams = np.zeros((mesh.points.shape[0],4))
-    if not "stim_nodes" in mesh.point_data.keys(): raise ValueError("No stim_nodes point data is present in vtk file") 
-    stimParams[:,0] = mesh.point_data["stim_nodes"]    #stim_period
-    stimParams[:,1] = 0 #mesh.point_data["stim_nodes"]    #stim_cyclelength
-    if not "stim_nodes_mag" in mesh.point_data.keys(): raise ValueError("No stim_nodes_mag point data is present in vtk file") 
-    stimParams[:,2] = mesh.point_data["stim_nodes_mag"]  #stim_mag
-    if not "stim_nodes_dur" in mesh.point_data.keys(): raise ValueError("No stim_nodes_dur point data is present in vtk file")
-    stimParams[:,3] = mesh.point_data["stim_nodes_dur"] * 0.5    #stim_dur
-    stimParams = stimParams.flatten().tolist()
+    #Get stim params from .vtk point data 
+    params = np.zeros((mesh.points.shape[0], 4)) 
+    if "stim_nodes" in mesh.point_data.keys():
+        params[:,0] = mesh.point_data["stim_nodes"]    #stim_period
+    if "stim_nodes_mag" in mesh.point_data.keys():
+        params[:,1] = mesh.point_data["stim_nodes_mag"]  #stim_mag
+    if "stim_nodes_dur" in mesh.point_data.keys():
+        params[:,2] = mesh.point_data["stim_nodes_dur"]    #stim_dur
+    
+    if "triangle" in mesh.cells_dict.keys():
+        regQuadFDrelations = getregQuadFDrelations(vertexs)  # Get finite difference relations for simulating
+        params = np.concatenate((params, regQuadFDrelations), axis=1)
 
-    return vertexs, cells, normals, meshType, voiInitValues, stimParams
+
+    #Get all as one dimensional list for passing to json and js
+    vertexs        = vertexs.flatten().tolist()
+    cells          = cells.flatten().tolist()
+    normals        = normals.flatten().tolist()
+    voiInitValues  = voiInitValues.flatten().tolist()
+    params         = params.flatten().tolist()
+
+    return vertexs, cells, normals, meshType, voiInitValues, params
     
 def createUniqueName(name):
     today = datetime.datetime.now()
@@ -74,10 +104,9 @@ def index(request):
             uniqueName = createUniqueName(uploadedFile.name)
             fs.save(uniqueName, uploadedFile)
             context['url'] = fs.url(uniqueName)
-            vertexs, cells, normals, meshType, voiInitValues, stimParams = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
-            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 'voiInitValues': voiInitValues, 'stimParams': stimParams}
+            vertexs, cells, normals, meshType, voiInitValues, params = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
+            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 'voiInitValues': voiInitValues, 'params': params}
             context ['data'] = data
-
     else:
         form = UploadFileForm()
         context ['form'] = form

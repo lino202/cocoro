@@ -1,6 +1,7 @@
 import { CreateSurf} from './createShapeSurf';
 import { CreateLine} from './createShapeLine';
 import { SimLine} from './simLine';
+import { SimSurf} from './simSurf';
 import { LightInputsInterface } from './mysettings';
 import { checkWebGPU, GetColorFromVertexs, getDataFromDjango } from './helper';
 import $ from 'jquery';
@@ -30,8 +31,11 @@ $('#btn-printvc').on('click',()=>{
     console.log(djangodata.normals)
     console.log("Init Values of Variable of Interest VoI")
     console.log(djangodata.voiInitValues)
-    console.log("Stim Params")
-    console.log(djangodata.stimParams)
+    console.log("Params")
+    console.log(djangodata.params)
+
+    // console.log("regQuadFDrelations")
+    // console.log(djangodata.regQuadFDrelations)
     // const meshData = getDataFromDjango(djangodata);
 });
 
@@ -47,12 +51,24 @@ $('#btn-printvc').on('click',()=>{
 $(document).ready(function(){
     
     const meshData = getDataFromDjango(djangodata);
-    let colors = GetColorFromVertexs(meshData.vertexs);
+    // let colors = GetColorFromVertexs(meshData.vertexs);
     if (meshData.meshType == "triangle"){
-        CreateSurf(meshData.vertexs, meshData.normals, meshData.indexs, colors, li);
+        if ($("#simulator").is(":checked")){
+            SimSurf(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+        }else{
+            let colors = GetColorFromVertexs(meshData.vertexs);
+            CreateSurf(meshData.vertexs, meshData.normals, meshData.indexs, colors, li);
+        }
+
+        
     }else if (meshData.meshType == "line") {
-        // CreateLine(meshData.vertexs, meshData.normals, meshData.indexs, colors, li)
-        SimLine(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.stimParams)
+        if ($("#simulator").is(":checked")){
+            SimLine(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+        }else{
+            let colors = GetColorFromVertexs(meshData.vertexs);
+            CreateLine(meshData.vertexs, meshData.normals, meshData.indexs, colors, li)
+        }
+
     }
 
 });

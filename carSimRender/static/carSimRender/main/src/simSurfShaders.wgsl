@@ -86,6 +86,7 @@ struct NodeParams {
     stim_amp: f32,
     stim_dur: f32,
     sim_dt: f32,
+    relations: vec4<f32>
 }
 
 @binding(0) @group(0) var<storage, read_write> vois : array<f32>;
@@ -94,11 +95,6 @@ struct NodeParams {
 // @binding(2) @group(0) var<storage, read_write> results : array<f32>;
 
 //Heat 
-// const dt      : f32 = 0.01;
-// const k       : f32 = 0.05;  //Diff termica [cm2/s]
-// const dx      : f32 = 0.1;
-// const lambda  : f32 = k * dt/(dx*dx) ;
-
 @compute @workgroup_size(64)
 fn comp_heat_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     
@@ -118,9 +114,9 @@ fn comp_heat_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>)
         }
     }
 
-    //Avoid extremes of line and compute Heat equation
-    if((idx >= arrayLength(&vois)-1) || (idx==0)) {return;}
-    vois[idx] = vois[idx] + sim_params.lambda * (vois[idx-1] - 2 * vois[idx] + vois[idx+1]);
+    //Avoid extremes of square and compute Heat equation
+    if(params[idx].relations[0]==-1.) {return;}
+    vois[idx] = vois[idx] + sim_params.lambda * (vois[u32(params[idx].relations[0])] + vois[u32(params[idx].relations[1])] + vois[u32(params[idx].relations[2])]+ vois[u32(params[idx].relations[3])] - 4 * vois[idx]);
     
 }
 
