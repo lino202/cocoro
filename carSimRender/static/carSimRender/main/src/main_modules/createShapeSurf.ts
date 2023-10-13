@@ -1,13 +1,13 @@
-import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from './helper';
-import {createAnimation, createGPUBufferUint } from './helper';
-import { LightInputsInterface } from './mysettings';
-import Shaders from './shaders.wgsl';
+import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from '../helpers/helper';
+import {createAnimation, createGPUBufferUint } from '../helpers/helper';
+import { LightInputsInterface } from '../helpers/mysettings';
+import Shaders from '../wgsl/shaders.wgsl';
 import { mat4, vec3 } from 'gl-matrix';
 
 const createCamera =require('3d-view-controls')
 
-export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, colorData:Float32Array, li:LightInputsInterface, isAnimation = false) => {
-    console.log("RENDERING LINE");
+export const CreateSurf = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, colorData:Float32Array, li:LightInputsInterface, isAnimation = false) => {
+    console.log("RENDERING SURFACE");
     const gpu = await initGPU();
     const device = gpu.device;
 
@@ -26,7 +26,9 @@ export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, ind
     const normalBuffer = createGPUBuffer(device, normals);
     const colorBuffer = createGPUBuffer(device, colorData);
     const indexBuffer = createGPUBufferUint(device, indexs);
+
  
+
     const pipeline = device.createRenderPipeline({
         layout: 'auto',
         vertex: {
@@ -79,7 +81,7 @@ export const CreateLine = async (vertexs:Float32Array, normals:Float32Array, ind
             ]
         },
         primitive:{
-            topology: "line-list",
+            topology: "triangle-list",
             // cullMode: 'back' No se que es
         },
         depthStencil:{

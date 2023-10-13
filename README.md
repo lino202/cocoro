@@ -22,10 +22,10 @@ For now it is working in chrome canary on windows only and in my case I have to 
 
    ```sh
    cd /path/carSim
-   python manager.py runserver 
+   python manage.py runserver 
    ```
 
-For now the page has to be http://localhost:8000/index and need to be open in Chrome Canary as this is browser supporting webGPU
+For now the page has to be http://localhost:8000/index and need to be open in a newer Chrome version as this browser supports webGPU
 
 
 ## Typescript

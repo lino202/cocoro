@@ -1,6 +1,5 @@
 import os  
 import argparse
-from platform import node
 import numpy as np
 import meshio
 import nibabel as nib

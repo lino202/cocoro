@@ -1,3 +1,5 @@
+// TODO This code is used only for showing shapes as for the course by Dr. Xi
+// it might be delete soon
 // vertex shader
 struct VertexUniforms {
     viewProjectionMatrix : mat4x4<f32>,

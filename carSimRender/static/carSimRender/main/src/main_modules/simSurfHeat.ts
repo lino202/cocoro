@@ -1,14 +1,15 @@
-import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from './helper';
-import { createGPUBufferUint } from './helper';
-import Shaders from './simLineShaders.wgsl';
+import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from '../helpers/helper';
+import { createGPUBufferUint } from '../helpers/helper';
+import renderShaders from '../wgsl/commonVertFragShaders.wgsl';
+import computeShaders from '../wgsl/simSurfShaders.wgsl';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui'
 const createCamera =require('3d-view-controls')
 
 // This simulates line without Light as it is not neccessary
 // Voi refers to Variable of interest
-export const SimLine = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, voiInitValues:Float32Array, stimParams:Float32Array) => {
-    console.log("RENDERING AND SIMULATING LINE");
+export const SimSurfHeat = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, voiInitValues:Float32Array, params:Float32Array) => {
+    console.log("RENDERING AND SIMULATING 2D Surface");
     const gpu = await initGPU();
     const device = gpu.device;
 
@@ -35,19 +36,19 @@ export const SimLine = async (vertexs:Float32Array, normals:Float32Array, indexs
     // create buffers
     const numberOfIndexes  = indexs.length;
     const numberOfVertices = voiInitValues.length;
-    const stimParamsNum    = Math.trunc(stimParams.length / numberOfVertices);
+    const paramsNum        = Math.trunc(params.length / numberOfVertices);
     const vertexBuffer     = createGPUBuffer(device, vertexs);
     const normalBuffer     = createGPUBuffer(device, normals);
     const indexBuffer      = createGPUBufferUint(device, indexs);
     const voiBuffer        = createGPUBuffer(device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
-    const stimParamsBuffer = createGPUBuffer(device, stimParams, GPUBufferUsage.STORAGE); //Check this Storage TODO
+    const paramsBuffer     = createGPUBuffer(device, params, GPUBufferUsage.STORAGE); //Check this Storage TODO
 
     // RENDER PIPELINE ---------------------------------------------------
     const renderPipeline = device.createRenderPipeline({
         layout: 'auto',
         vertex: {
             module: device.createShaderModule({                    
-                code: Shaders
+                code: renderShaders
             }),
             entryPoint: "vs_main",
             buffers:[
@@ -88,7 +89,7 @@ export const SimLine = async (vertexs:Float32Array, normals:Float32Array, indexs
         },
         fragment: {
             module: device.createShaderModule({                    
-                code: Shaders
+                code: renderShaders
             }),
             entryPoint: "fs_main",
             targets: [
@@ -98,7 +99,7 @@ export const SimLine = async (vertexs:Float32Array, normals:Float32Array, indexs
             ]
         },
         primitive:{
-            topology: "line-list",
+            topology: "triangle-list",
             // cullMode: 'back'
         },
         depthStencil:{
@@ -194,7 +195,7 @@ export const SimLine = async (vertexs:Float32Array, normals:Float32Array, indexs
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: Shaders,
+            code: computeShaders,
           }),
           entryPoint: 'comp_heat_main',
         },
@@ -214,9 +215,9 @@ export const SimLine = async (vertexs:Float32Array, normals:Float32Array, indexs
                 {
                     binding: 1,
                     resource: {
-                        buffer: stimParamsBuffer,
+                        buffer: paramsBuffer,
                         offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices * stimParamsNum,
+                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices * paramsNum,
                     },
                 },
                 {

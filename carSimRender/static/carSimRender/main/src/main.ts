@@ -1,9 +1,9 @@
-import { CreateSurf} from './createShapeSurf';
-import { CreateLine} from './createShapeLine';
-import { SimLine} from './simLine';
-import { SimSurf} from './simSurf';
-import { LightInputsInterface } from './mysettings';
-import { checkWebGPU, GetColorFromVertexs, getDataFromDjango } from './helper';
+import { CreateSurf} from './main_modules/createShapeSurf';
+import { CreateLine} from './main_modules/createShapeLine';
+import { SimLineHeat} from './main_modules/simLineHeat';
+import { SimSurfHeat} from './main_modules/simSurfHeat';
+import { LightInputsInterface } from './helpers/mysettings';
+import { checkWebGPU, GetColorFromVertexs, getDataFromDjango } from './helpers/helper';
 import $ from 'jquery';
 
 declare let djangodata: any;
@@ -54,7 +54,7 @@ $(document).ready(function(){
     // let colors = GetColorFromVertexs(meshData.vertexs);
     if (meshData.meshType == "triangle"){
         if ($("#simulator").is(":checked")){
-            SimSurf(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+            SimSurfHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
         }else{
             let colors = GetColorFromVertexs(meshData.vertexs);
             CreateSurf(meshData.vertexs, meshData.normals, meshData.indexs, colors, li);
@@ -63,7 +63,7 @@ $(document).ready(function(){
         
     }else if (meshData.meshType == "line") {
         if ($("#simulator").is(":checked")){
-            SimLine(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+            SimLineHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
         }else{
             let colors = GetColorFromVertexs(meshData.vertexs);
             CreateLine(meshData.vertexs, meshData.normals, meshData.indexs, colors, li)

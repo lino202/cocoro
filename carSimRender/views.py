@@ -10,10 +10,10 @@ import datetime
 import copy
 from scipy.spatial import KDTree
 
-
+# TODO This might not been done here as it could be to slow
 def getregQuadFDrelations(points):
     thres = np.unique(np.abs(np.diff(points,axis=0)))[1]
-    thres = np.sqrt(2*thres**2) - 1e-6
+    thres = thres + np.abs(np.sqrt(2*thres**2) - thres)/2
     print("Threshold used for the search in getregQuadFDrelations {}".format(thres))
     tree = KDTree(points)
     res = tree.query_ball_point(points, thres - 1e-6)
@@ -92,7 +92,8 @@ def createUniqueName(name):
     uniqueName = name.split('.')[0] + '_' + date_time + '.' + name.split('.')[1]
     return uniqueName
 
-# Create your views here.
+# Main view.
+# Here we upload the mesh and parese its information
 def index(request):
     context = {}
     if request.method == 'POST':
