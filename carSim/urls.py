@@ -19,7 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('index/', include('carSimRender.urls')),
+    path('', include('carSimMain.urls')),  #This adds all views/urls for that app carSimMain
     path('admin/', admin.site.urls),
 ]
 

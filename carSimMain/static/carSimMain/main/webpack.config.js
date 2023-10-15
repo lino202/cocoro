@@ -3,7 +3,8 @@ const bundleOutputDir = "./dist";
 
 module.exports = {
     entry: {
-        main: "./src/main"  
+        main_tissue:   "./src/main_tissue",
+        main_cellular: "./src/main_cellular"
     },
     output: {
         filename: "[name].bundle.js",

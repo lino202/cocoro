@@ -15,7 +15,7 @@ struct VisualParams {
 @binding(1) @group(0) var<uniform> visual_params : VisualParams;
 
 
-struct Output {
+struct Output { // This is different from input buffers in createRenderPipeline
     @builtin(position) Position : vec4<f32>,
     @location(0) vPosition : vec4<f32>,
     @location(1) vNormal : vec4<f32>,
@@ -32,8 +32,12 @@ fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>, @l
 
     //Get vertex color [0-1] based on normalized VoI computed in compute shader
     //Normalize for visualization
-    let voiNorm = (voi - visual_params.voiMin) / (visual_params.voiMax - visual_params.voiMin);                  
-    output.vColor = color_map_turbo(voiNorm); 
+    if (voi < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
+        let voiNorm = (voi - visual_params.voiMin) / (visual_params.voiMax - visual_params.voiMin);                  
+        output.vColor = color_map_turbo(voiNorm); 
+    }else{
+        output.vColor = vec3<f32>(1.,0.,1.); //Plot in magenta overflow, nan or inf
+    }
     return output;
 }
 

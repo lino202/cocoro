@@ -1,7 +1,7 @@
 import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from '../helpers/helper';
 import { createGPUBufferUint } from '../helpers/helper';
 import renderShaders from '../wgsl/commonVertFragShaders.wgsl';
-import computeShaders from '../wgsl/simSurfShaders.wgsl';
+import computeShaders from '../wgsl/simSurfHeatShader.wgsl';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui'
 const createCamera =require('3d-view-controls')

@@ -5,7 +5,7 @@ Simulations in the GPU throught the web.
 
 # Usage
 
-For now it is working in chrome canary on windows only and in my case I have to set msi pc dragon center to use the discrete gpu
+For now it is working in chrome on windows only and in my case I have to set msi pc dragon center to use the discrete gpu
 
 # Install 
 
@@ -13,7 +13,7 @@ For now it is working in chrome canary on windows only and in my case I have to 
    cd /parent/folder
    git clone https://github.com/lino202/carSim
    cd carSim
-   cd carSimRender/static/carSimRender/main/
+   cd carSimMain/static/carSimMain/main/
    npm install
    npm run prod
    ```
@@ -35,7 +35,7 @@ The core of the software is written in Typescript. These code calls the shaders 
 Go to where the webpack and package.json are which define how the compilation happens for ts files
 
    ```sh
-   cd /path/carSim/carSimRender/static/carSimRender/main/src/
+   cd /path/carSim/carSimMain/static/carSimMain/main/src/
    npm run prod
    ```
 

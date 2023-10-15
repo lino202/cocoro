@@ -1,0 +1,339 @@
+import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from '../helpers/helper';
+import { createGPUBufferUint } from '../helpers/helper';
+import renderShaders from '../wgsl/commonVertFragShaders.wgsl';
+import computeShaders from '../wgsl/simLineMonodomainShader.wgsl';
+import { mat4, vec3 } from 'gl-matrix';
+import { GUI } from 'dat.gui'
+const createCamera =require('3d-view-controls')
+
+// This simulates line without Light as it is not neccessary
+// Voi refers to Variable of interest
+export const SimLineMonodomain = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, voiInitValues:Float32Array, stimParams:Float32Array) => {
+    console.log("RENDERING AND SIMULATING LINE");
+    const gpu = await initGPU();
+    const device = gpu.device;
+
+    //General simulation and visualization params
+    const simParams = {
+        simulate : true,
+        dt       : 0.1,     //Integration max time (as it is adaptative it might be lower than this) [ms]
+        dx       : 0.1,     //Mesh edglength [mm] 
+        Cm       : 0.00001, //Membrane capacitance [mF/mm^2]
+        beta     : 100000,  //Surf-to-Volume ratio [1/m]
+        G        : 0.12,   //Conductivity [S/m]
+    }; 
+    // With this units the V should be given in mV for correct computation
+    // for the stimulation and ionic current densities they should be given in mA/mm^2
+
+    const visualParams = {
+        voiMin   : -80.,
+        voiMax   : 50.,
+    }
+
+    //Dat.gui definition
+    const gui             = new GUI();
+    const visualGUIFolder = gui.addFolder('Visualization')
+    const simGUIFolder    = gui.addFolder('Simulation')
+    Object.keys(visualParams).forEach((k) => {visualGUIFolder.add(visualParams, k);});
+    Object.keys(simParams).forEach((k) => {simGUIFolder.add(simParams, k);});
+
+    // create buffers
+    const numberOfIndexes  = indexs.length;
+    const numberOfVertices = voiInitValues.length;
+    const stimParamsNum    = Math.trunc(stimParams.length / numberOfVertices);
+    const vertexBuffer     = createGPUBuffer(device, vertexs);
+    const normalBuffer     = createGPUBuffer(device, normals);
+    const indexBuffer      = createGPUBufferUint(device, indexs);
+    const voiBuffer        = createGPUBuffer(device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
+    const stimParamsBuffer = createGPUBuffer(device, stimParams, GPUBufferUsage.STORAGE); //Check this Storage TODO
+
+    // RENDER PIPELINE ---------------------------------------------------
+    const renderPipeline = device.createRenderPipeline({
+        layout: 'auto',
+        vertex: {
+            module: device.createShaderModule({                    
+                code: renderShaders
+            }),
+            entryPoint: "vs_main",
+            buffers:[
+                {
+                    arrayStride: Float32Array.BYTES_PER_ELEMENT * 3,
+                    attributes: [
+                        {
+                            //Vertex positions
+                            shaderLocation: 0,
+                            format: "float32x3",
+                            offset: 0
+                        }
+                    ]
+                },
+                {
+                    arrayStride: Float32Array.BYTES_PER_ELEMENT * 3,
+                    attributes: [
+                        {
+                            //Vertex normals
+                            shaderLocation: 1,
+                            format: "float32x3",
+                            offset: 0
+                        }
+                    ]
+                },
+                {
+                    arrayStride: Float32Array.BYTES_PER_ELEMENT,
+                    attributes: [
+                        {
+                            //Vertex VoI shared with compute shader
+                            shaderLocation: 2,
+                            format: "float32",
+                            offset: 0
+                        }
+                    ]
+                }
+            ]
+        },
+        fragment: {
+            module: device.createShaderModule({                    
+                code: renderShaders
+            }),
+            entryPoint: "fs_main",
+            targets: [
+                {
+                    format: gpu.textureFormat as GPUTextureFormat
+                }
+            ]
+        },
+        primitive:{
+            topology: "line-list",
+            // cullMode: 'back'
+        },
+        depthStencil:{
+            format: "depth24plus",
+            depthWriteEnabled: true,
+            depthCompare: "less"
+        }
+    });
+
+    // create render uniform data (for camera control and visualization)
+    const normalMatrix = mat4.create();
+    const modelMatrix = mat4.create();
+    let vMatrix = mat4.create();
+    let vpMatrix = mat4.create();
+    const vp = createViewProjection(gpu.canvas.width/gpu.canvas.height);
+    vpMatrix = vp.viewProjectionMatrix;
+
+    // add rotation and camera:
+    let rotation = vec3.fromValues(0, 0, 0);       
+    var camera = createCamera(gpu.canvas, vp.cameraOption);
+
+    const vertexRenderBuffer = device.createBuffer({
+        size: 192,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    const visualParamsBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * 2,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    const renderBindGroup = device.createBindGroup({
+        layout: renderPipeline.getBindGroupLayout(0),
+        entries: [
+            {
+                binding: 0,
+                resource: {
+                    buffer: vertexRenderBuffer,
+                    offset: 0,
+                    size: 192
+                }
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: visualParamsBuffer,
+                    offset: 0,
+                    size: Float32Array.BYTES_PER_ELEMENT * 2
+                }
+            }           
+        ]
+    });
+
+    let textureView = gpu.context.getCurrentTexture().createView();
+    const depthTexture = device.createTexture({
+        size: [gpu.canvas.width, gpu.canvas.height, 1],
+        format: "depth24plus",
+        usage: GPUTextureUsage.RENDER_ATTACHMENT
+    });
+    
+    const renderPassDescription = {
+        colorAttachments: [{
+            view: textureView,
+            clearValue: { r: 0.5, g: 0.5, b: 0.8, a: 1.0 }, //background color
+            loadOp: "clear",
+            storeOp: "store"
+        }],
+        depthStencilAttachment: {
+            view: depthTexture.createView(),
+            depthClearValue: 1.0,
+            depthLoadOp: "clear",
+            depthStoreOp: "store",
+        }
+    };
+
+    // COMPUTE PIPELINE ---------------------------------------------------
+
+    // Result Matrix
+    // const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * 64;
+    // const resultMatrixBuffer = device.createBuffer({
+    //     size: resultMatrixBufferSize,
+    //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+    // });
+    
+    //SimParams is an uniform as it contains
+    //"uniform" data to the overall simulation
+    const simParamsBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * 3, // only need dt and lambda and Cm
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const computePipeline = device.createComputePipeline({
+        layout: 'auto',
+        compute: {
+          module: device.createShaderModule({
+            code: computeShaders,
+          }),
+          entryPoint: 'comp_monodomain_main',
+        },
+    });
+
+    const computeBindGroup = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: voiBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices,
+                    },
+                },
+                {
+                    binding: 1,
+                    resource: {
+                        buffer: stimParamsBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices * stimParamsNum,
+                    },
+                },
+                {
+                    binding: 2,
+                    resource: {
+                        buffer: simParamsBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * 3,
+                    },
+                }
+                // {
+                //     binding: 2,
+                //     resource: {
+                //         buffer: resultMatrixBuffer,
+                //         offset: 0,
+                //     },
+                // }
+            ],
+    });
+
+    
+    //Draw function for updating data on canvas and triggering gpu updates
+    function draw() {
+        
+        //Update Simulations Params
+        device.queue.writeBuffer(
+            simParamsBuffer,
+            0,
+            new Float32Array([
+              simParams.simulate ? simParams.dt : 0.0,
+              simParams.G / (simParams.dx*simParams.dx * simParams.beta * simParams.Cm),
+              simParams.Cm,
+            ])
+        );
+
+        //Update Visualization Params
+        device.queue.writeBuffer(
+            visualParamsBuffer,
+            0,
+            new Float32Array([
+              visualParams.voiMax,   
+              visualParams.voiMin
+            ])
+        );
+
+        // Update camera
+        if(camera.tick()){  
+            const pMatrix = vp.projectionMatrix;
+            vMatrix = camera.matrix;
+            mat4.multiply(vpMatrix, pMatrix, vMatrix);
+            device.queue.writeBuffer(vertexRenderBuffer, 0, vpMatrix as ArrayBuffer);
+        
+            createTransforms(modelMatrix,[0,0,0], rotation);
+            mat4.invert(normalMatrix, modelMatrix);
+            mat4.transpose(normalMatrix, normalMatrix);
+            device.queue.writeBuffer(vertexRenderBuffer, 64, modelMatrix as ArrayBuffer);
+            device.queue.writeBuffer(vertexRenderBuffer, 128, normalMatrix as ArrayBuffer);
+        }
+                    
+        //Generate the command encoder for both pipelines (Render and Compute)
+        //and send them to the gpu
+        const commandEncoder = device.createCommandEncoder();
+        {   //Compute Update
+            const passEncoder = commandEncoder.beginComputePass();
+            passEncoder.setPipeline(computePipeline);
+            passEncoder.setBindGroup(0, computeBindGroup);
+            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices / 64));
+            passEncoder.end();
+        }
+        {   //Render Update
+            textureView = gpu.context.getCurrentTexture().createView();
+            renderPassDescription.colorAttachments[0].view = textureView;
+            
+            const passEncoder = commandEncoder.beginRenderPass(renderPassDescription as GPURenderPassDescriptor);
+            passEncoder.setPipeline(renderPipeline);
+            passEncoder.setVertexBuffer(0, vertexBuffer);
+            passEncoder.setVertexBuffer(1, normalBuffer);
+            passEncoder.setVertexBuffer(2, voiBuffer);
+            passEncoder.setIndexBuffer(indexBuffer, 'uint32');
+            passEncoder.setBindGroup(0, renderBindGroup);
+            passEncoder.drawIndexed(numberOfIndexes);
+            passEncoder.end();
+        }
+        device.queue.submit([commandEncoder.finish()]);
+        requestAnimationFrame(draw)
+
+        // // RESULTS Get a GPU buffer for reading in an unmapped state.
+        // const gpuReadBuffer = device.createBuffer({
+        //     size: resultMatrixBufferSize,
+        //     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+        // });
+
+        // // Encode commands for copying buffer to buffer.
+        // commandEncoder.copyBufferToBuffer(
+        //     resultMatrixBuffer /* source buffer */,
+        //     0 /* source offset */,
+        //     gpuReadBuffer /* destination buffer */,
+        //     0 /* destination offset */,
+        //     resultMatrixBufferSize /* size */
+        // );
+
+        // // Submit GPU commands.
+        // const gpuCommands = commandEncoder.finish();
+        // device.queue.submit([gpuCommands]);
+
+        // // Read buffer.
+        // await gpuReadBuffer.mapAsync(GPUMapMode.READ);
+        // const arrayBuffer = gpuReadBuffer.getMappedRange();
+        // console.log(new Float32Array(arrayBuffer));
+
+    }
+
+    requestAnimationFrame(draw)
+
+}

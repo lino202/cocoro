@@ -55,13 +55,15 @@ def getDataFromMesh(meshPath):
     
     #Get normals
     normals = np.zeros((mesh.points.shape[0],3))
-    for key in mesh.point_data.keys():
-        if 'vn' in key:
-            normals = mesh.point_data[key]
-            break
+    if 'vn' in mesh.point_data.keys():
+        normals = mesh.point_data['vn']
+
 
     #Get init Values for Voi
-    voiInitValues = np.zeros(mesh.points.shape[0])
+    if 'voi_init' in mesh.point_data.keys():
+        voiInitValues = mesh.point_data['voi_init']
+    else:
+        voiInitValues = np.zeros(mesh.points.shape[0])
     
     #Get stim params from .vtk point data 
     params = np.zeros((mesh.points.shape[0], 4)) 
@@ -94,7 +96,7 @@ def createUniqueName(name):
 
 # Main view.
 # Here we upload the mesh and parese its information
-def index(request):
+def tissue(request):
     context = {}
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES)
@@ -113,4 +115,11 @@ def index(request):
         context ['form'] = form
 
 
-    return render(request, 'index.html', context)
+    return render(request, 'carSimMain/tissue.html', context)
+
+
+# Cellular view.
+# Here we can run cellular simulations and plots
+def cellular(request):
+    # context = {}
+    return render(request, 'carSimMain/cellular.html')

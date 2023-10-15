@@ -15,7 +15,7 @@
     "@types/dat.gui": "^0.7.7",
     "@types/jquery": "^3.5.10",
     "@types/node": "^17.0.2",
-    "@webgpu/types": "^0.1.23",
+    "@webgpu/types": "^0.1.38",
     "3d-view-controls": "^2.2.2",
     "css-loader": "^6.5.1",
     "dat.gui": "^0.7.9",

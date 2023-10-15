@@ -1,7 +1,11 @@
 import { CreateSurf} from './main_modules/createShapeSurf';
 import { CreateLine} from './main_modules/createShapeLine';
+
 import { SimLineHeat} from './main_modules/simLineHeat';
 import { SimSurfHeat} from './main_modules/simSurfHeat';
+
+import { SimLineMonodomain} from './main_modules/simLineMonodomain';
+
 import { LightInputsInterface } from './helpers/mysettings';
 import { checkWebGPU, GetColorFromVertexs, getDataFromDjango } from './helpers/helper';
 import $ from 'jquery';
@@ -63,7 +67,8 @@ $(document).ready(function(){
         
     }else if (meshData.meshType == "line") {
         if ($("#simulator").is(":checked")){
-            SimLineHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+            // SimLineHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+            SimLineMonodomain(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
         }else{
             let colors = GetColorFromVertexs(meshData.vertexs);
             CreateLine(meshData.vertexs, meshData.normals, meshData.indexs, colors, li)
