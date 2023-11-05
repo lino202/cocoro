@@ -1,18 +1,10 @@
 import { initGPU, createGPUBuffer} from '../helpers/helper';
 import { createGPUBufferUint } from '../helpers/helper';
-import renderShaders from '../wgsl/plot2DShaders.wgsl';
+import renderShaders from '../cellModels/plot2DShaders.wgsl';
 import { initCanvas, setY, setX } from '../helpers/axis';
+// import computeGaurShader from '../cellModels/gaur.wgsl';
+import computeFKShader from '../cellModels/fenton_karma.wgsl';
 import { GUI } from 'dat.gui';
-
-
-function randomWalk(initial: number, walkSize: number): Float32Array {
-    const y = new Float32Array(walkSize);
-    y[0] = initial + 0.01 * (Math.round(Math.random()) - 0.5);
-    for (let i = 1; i < walkSize; i++) {
-      y[i] = y[i - 1] + 0.01 * (Math.round(Math.random()) - 0.5);
-    }
-    return y;
-}
 
 
 function getIndexesForLine(numPoints: number): Uint32Array{
@@ -29,47 +21,46 @@ function getIndexesForLine(numPoints: number): Uint32Array{
     return indexs;
 }
 
-function simpleFunction(numPoints: number): Float32Array {
+function genInitArrays(numPoints: number): Float32Array {
     const xy = new Float32Array(numPoints*2);
-    
-    // var j = 0;
+    const y = new Float32Array(numPoints);
+
+    var j = 0;
     for (let i = 0; i < numPoints*2; i=i+2) {
       xy[i] = i/numPoints -1;
       xy[i+1] = 0.0;
-    //   j++;
+      y[j] = 0.0;
+      j++;
     }
-    return xy;
-}
 
-
-function getNewValueArray(vertexs: Float32Array): Float32Array{
-    var newValue = vertexs[vertexs.length - 1] + 0.01 * (Math.round(Math.random()) - 0.5);
-    var newVertexs = Float32Array.from(vertexs);
+    const result = new Float32Array(xy.length + y.length);
     
-    for (let i = vertexs.length-1; i>0; i=i-2){
-        if (i != vertexs.length-1){
-            newVertexs[i] = vertexs[i+2];   
-        }else{
-            newVertexs[vertexs.length-1] = newValue;
-        }
-        
-    }
-
-    return newVertexs;
+    result.set(xy, 0);
+    result.set(y, xy.length);
+    return result;
 }
-
 
 // This simulates line without Light as it is not neccessary
 // Voi refers to Variable of interest
-export const SimCell = async (gui: GUI) => {
+export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, number>, constants:Record<string, number>, stim:Record<string, number>, visualParams:Record<string, number>) => {
     console.log("RENDERING PLOT AND SIMULATING CELL MODEL:");
-    console.log(gui.__folders.Simulation.__controllers[0].getValue())
+    console.log(cellModel)
+
+    const integ = {
+        simulate: true,
+        dt : 0.1,
+    }
+    const integFolder = gui.addFolder('Integration');
+    Object.keys(integ).forEach((k) => {integFolder.add(integ, k);});
+
     const gpu = await initGPU();
     const device = gpu.device;
 
-    const numPoints = 300;
+    const numPoints = 3000;
     const indexs = getIndexesForLine(numPoints);
-    var vertexs   = simpleFunction(numPoints);
+    var tmp   = genInitArrays(numPoints);
+    var vertexs = tmp.slice(0,numPoints*2);
+    var voiInitValues = tmp.slice(numPoints*2,tmp.length);
 
     //Get canvases for axes
     const canvasX = document.getElementById("canvas_xAxis") as HTMLCanvasElement;
@@ -77,17 +68,25 @@ export const SimCell = async (gui: GUI) => {
 
     const ctxX = initCanvas(canvasX);
     const ctxY = initCanvas(canvasY);
-    const ymax = gui.__folders.Visualization.__controllers[1].getValue();
-    const ymin = gui.__folders.Visualization.__controllers[0].getValue()
+    // const ymax = gui.__folders.Visualization.__controllers[1].getValue();
+    // const ymin = gui.__folders.Visualization.__controllers[0].getValue()
 
-    if (ctxY) {setY(ctxY, canvasY.width, canvasY.height, ymin, ymax, 10);}
+    if (ctxY) {setY(ctxY, canvasY.width, canvasY.height, visualParams.voiMin, visualParams.voiMax, 10);}
     if (ctxX) {setX(ctxX, canvasX.width, canvasX.height, 0, numPoints, 10);}
 
-    // create buffers
+    // create buffers 
+
+    const stimArray = new Float32Array([stim.period, stim.amp, stim.dur, stim.start])
+    const statesArray = new Float32Array(Object.values(states))
+    const constantsArray = new Float32Array(Object.values(constants))
+    const integrationArray = new Float32Array([integ.dt]) 
+    const visualParamsArray = new Float32Array(Object.values(visualParams))
+
     const numberOfIndexes  = indexs.length;
-    const numberOfVertices = numPoints;
+    // const numberVoiValues = numPoints;
     const vertexBuffer     = createGPUBuffer(device, vertexs);
     const indexBuffer      = createGPUBufferUint(device, indexs);
+    const voiBuffer        = createGPUBuffer(device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
     
     // RENDER PIPELINE ---------------------------------------------------
     // We need to set the render pipeline
@@ -106,6 +105,17 @@ export const SimCell = async (gui: GUI) => {
                         //X-Y coordinates
                         shaderLocation: 0,
                         format: "float32x2",
+                        offset: 0
+                    }
+                ]
+            },
+            {
+                arrayStride: Float32Array.BYTES_PER_ELEMENT,
+                attributes: [
+                    {
+                        //Vertex VoI shared with compute shader
+                        shaderLocation: 1,
+                        format: "float32",
                         offset: 0
                     }
                 ]
@@ -135,25 +145,6 @@ export const SimCell = async (gui: GUI) => {
     });
 
 
-    // const plotPropertiesBuffer = device.createBuffer({
-    //     size: Float32Array.BYTES_PER_ELEMENT * 4, // scale and offset for x and y
-    //     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-    // });
-
-    // const renderBindGroup = device.createBindGroup({
-    //     layout: renderPipeline.getBindGroupLayout(0),
-    //     entries: [
-    //         {
-    //             binding: 0,
-    //             resource: {
-    //                 buffer: plotPropertiesBuffer,
-    //                 offset: 0,
-    //                 size: Float32Array.BYTES_PER_ELEMENT * 4
-    //             }
-    //         }           
-    //     ]
-    // });
-
     let textureView = gpu.context.getCurrentTexture().createView();
     const depthTexture = device.createTexture({
         size: [gpu.canvas.width, gpu.canvas.height, 1],
@@ -175,36 +166,209 @@ export const SimCell = async (gui: GUI) => {
             depthStoreOp: "store",
         }
     };
+
+    // COMPUTE PIPELINE ---------------------------------------------------
     
+    //States and Constants Buffer is an uniform that takes all the initialize variables (constants and states)
+    const statesBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const constantsBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const stimBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * stimArray.length,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const integBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * integrationArray.length,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const visualParamsBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    // Result Matrix
+    // const resultsBufferSize = Float32Array.BYTES_PER_ELEMENT * voiInitValues.length;
+    // const resultsBuffer = device.createBuffer({
+    //     size: resultsBufferSize,
+    //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+    // });
+
+    var computeShader;
+    if (cellModel == 'Fenton_Karma'){
+        computeShader = computeFKShader;
+    // }else if (cellModel == 'Gaur'){
+    //     computeShader = computeGaurShader;
+    }else{
+        throw new Error(`Unknown Cell Model "${cellModel}"`)
+    }
+ 
+
+    const computePipeline = device.createComputePipeline({
+        layout: 'auto',
+        compute: {
+          module: device.createShaderModule({
+            code: computeShader,
+          }),
+          entryPoint: 'comp_main',
+        },
+    });
+
+    const computeBindGroup = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
+            entries: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: voiBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * numPoints,
+                    },
+                },
+                {
+                    binding: 1,
+                    resource: {
+                        buffer: statesBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
+                    },
+                },
+                {
+                    binding: 2,
+                    resource: {
+                        buffer: constantsBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
+                    },
+                },
+                {
+                    binding: 3,
+                    resource: {
+                        buffer: stimBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * stimArray.length,
+                    },
+                },
+                {
+                    binding: 4,
+                    resource: {
+                        buffer: integBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * integrationArray.length,
+                    },
+                },
+                {
+                    binding: 5,
+                    resource: {
+                        buffer: visualParamsBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+                    },
+                }
+                // {
+                //     binding: 6,
+                //     resource: {
+                //         buffer: resultsBuffer,
+                //         offset: 0,
+                //     },
+                // }
+            ],
+    });
+
+
+    // TODO visual Params in gui might be blocked when simulating as they cannot be changed there
+    device.queue.writeBuffer(
+        visualParamsBuffer,
+        0,
+        visualParamsArray
+    );
+
+
+    device.queue.writeBuffer(
+        statesBuffer,
+        0,
+        statesArray
+    );
+
     //Draw function for updating data on canvas and triggering gpu updates
     function draw() {
-
-        vertexs = getNewValueArray(vertexs);
         
-        //Update signal
+        //Update params (only constants and stim. States and visuals won't change for now)
         device.queue.writeBuffer(
-            vertexBuffer,
+            stimBuffer,
             0,
-            vertexs
+            new Float32Array([stim.period, stim.amp, stim.dur, stim.start])
+        );
+        device.queue.writeBuffer(
+            constantsBuffer,
+            0,
+            new Float32Array(Object.values(constants))
+        );
+        device.queue.writeBuffer(
+            integBuffer,
+            0,
+            new Float32Array([
+              integ.simulate ? integ.dt : 0.0,   
+            ])
         );
 
 
         //Generate the command encoder for both pipelines (Render and Compute)
         //and send them to the gpu
         const commandEncoder = device.createCommandEncoder();
-        textureView = gpu.context.getCurrentTexture().createView();
-        renderPassDescription.colorAttachments[0].view = textureView;
-        
-        const passEncoder = commandEncoder.beginRenderPass(renderPassDescription as GPURenderPassDescriptor);
-        passEncoder.setPipeline(renderPipeline);
-        passEncoder.setVertexBuffer(0, vertexBuffer);
-        passEncoder.setIndexBuffer(indexBuffer, 'uint32');
-        // passEncoder.setBindGroup(0, renderBindGroup);
-        passEncoder.drawIndexed(numberOfIndexes);
-        passEncoder.end();
 
+        {   //Compute Update
+            const passEncoder = commandEncoder.beginComputePass();
+            passEncoder.setPipeline(computePipeline);
+            passEncoder.setBindGroup(0, computeBindGroup);
+            passEncoder.dispatchWorkgroups(Math.ceil(numPoints / 64));
+            passEncoder.end();
+        }
+        {   //Render Update
+            textureView = gpu.context.getCurrentTexture().createView();
+            renderPassDescription.colorAttachments[0].view = textureView;
+            
+            const passEncoder = commandEncoder.beginRenderPass(renderPassDescription as GPURenderPassDescriptor);
+            passEncoder.setPipeline(renderPipeline);
+            passEncoder.setVertexBuffer(0, vertexBuffer);
+            passEncoder.setVertexBuffer(1, voiBuffer);
+            passEncoder.setIndexBuffer(indexBuffer, 'uint32');
+            // passEncoder.setBindGroup(0, renderBindGroup);
+            passEncoder.drawIndexed(numberOfIndexes);
+            passEncoder.end();
+        }
         device.queue.submit([commandEncoder.finish()]);
         requestAnimationFrame(draw);
+
+        // RESULTS Get a GPU buffer for reading in an unmapped state.
+        // const gpuReadBuffer = device.createBuffer({
+        //     size: resultsBufferSize,
+        //     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+        // });
+
+        // // Encode commands for copying buffer to buffer.
+        // commandEncoder.copyBufferToBuffer(
+        //     resultsBuffer /* source buffer */,
+        //     0 /* source offset */,
+        //     gpuReadBuffer /* destination buffer */,
+        //     0 /* destination offset */,
+        //     resultsBufferSize /* size */
+        // );
+
+        // // Submit GPU commands.
+        // const gpuCommands = commandEncoder.finish();
+        // device.queue.submit([gpuCommands]);
+
+        // // Read buffer.
+        // await gpuReadBuffer.mapAsync(GPUMapMode.READ);
+        // const arrayBuffer = gpuReadBuffer.getMappedRange();
+        // console.log(new Float32Array(arrayBuffer));
+
+        // requestAnimationFrame(draw);
 
     }
 
