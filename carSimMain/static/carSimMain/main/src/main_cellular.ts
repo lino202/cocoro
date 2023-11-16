@@ -15,7 +15,8 @@ import $ from 'jquery';
 const visualParams = {
     voiMax   : 60,
     voiMin   : -100,
-    plot_dt  : 1
+    plot_dt  : 1,     // This should be in ms if dt is in ms
+    num_points : 3000
 }
 const gui             = new GUI();
 
@@ -23,11 +24,6 @@ $('#btn-simulate').on('click',()=>{
     const cellModel = gui.__folders.Simulation.__controllers[0].getValue()
     const cellType = gui.__folders.Simulation.__controllers[1].getValue()
     var params;
-
-
-    // TODO Here we must read from the gui and not the default parameters in case an user has changed them
-    // Also the visual params in which we need to have the num of points! and maybe also add the x axis to be ms
-    // taking into account numPoints dt and dt_plot
 
     // Also period is not working if not with the default fentonKarma so I think there's no more connection between
     // gui and buffers when it is not the default I suspeect it might be due to the switching I do here
@@ -103,24 +99,33 @@ function changeCellModel(this: any){
 function changeCellTypes(this: any){
     const newCellType = this.object.Cell_Type;
     this.__gui.removeFolder(this.__gui.__folders.Constants)
+    this.__gui.removeFolder(this.__gui.__folders.Stim)
     const constantsFolder = this.__gui.getRoot().__folders.Simulation.addFolder('Constants')
+    const stimFolder = this.__gui.getRoot().__folders.Simulation.addFolder('Stim')
 
-    var cellParams : Object;
+    var cellParamsConsts : Object;
+    var cellParamsStims  : Object;
     if (newCellType == 'BR'){
-        cellParams = cellModelParamsFKBR.constants;
+        cellParamsConsts = cellModelParamsFKBR.constants;
+        cellParamsStims = cellModelParamsFKBR.stim;
     }else if (newCellType == 'GP'){
-        cellParams = cellModelParamsFKGP.constants;
+        cellParamsConsts = cellModelParamsFKGP.constants;
+        cellParamsStims = cellModelParamsFKGP.stim;
     }else if (newCellType == 'MBR'){
-        cellParams = cellModelParamsFKMBR.constants;
+        cellParamsConsts = cellModelParamsFKMBR.constants;
+        cellParamsStims = cellModelParamsFKMBR.stim;
     }else if (newCellType == 'MLR-1'){
-        cellParams = cellModelParamsFKMLR1.constants;
+        cellParamsConsts = cellModelParamsFKMLR1.constants;
+        cellParamsStims = cellModelParamsFKMLR1.stim;
     }else if (newCellType == 'GaurUnique'){
-        cellParams = cellModelParamsGaur.constants;
+        cellParamsConsts = cellModelParamsGaur.constants;
+        cellParamsStims = cellModelParamsGaur.stim;
     }else{
         throw new Error(`Unknown Cell Type "${newCellType}"`)
     }
 
-    Object.keys(cellParams).forEach((k) => {constantsFolder.add(cellParams, k)});
+    Object.keys(cellParamsConsts).forEach((k) => {constantsFolder.add(cellParamsConsts, k)});
+    Object.keys(cellParamsStims).forEach((k) => {stimFolder.add(cellParamsStims, k)});
 
 }
 

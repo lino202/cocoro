@@ -1,7 +1,7 @@
 
 export const cellTypesFK = ['BR','GP', 'MBR', 'MLR-1']
 
-// Here we totally have to rethink this to make it less repetitive and also
+// TODO Here we totally have to rethink this to make it less repetitive and also
 // we might need to use interfaces for extending the properties that are common
 // as n_perios and t
 

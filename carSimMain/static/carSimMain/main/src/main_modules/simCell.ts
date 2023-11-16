@@ -56,11 +56,10 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     const gpu = await initGPU();
     const device = gpu.device;
 
-    const numPoints = 3000;
-    const indexs = getIndexesForLine(numPoints);
-    var tmp   = genInitArrays(numPoints);
-    var vertexs = tmp.slice(0,numPoints*2);
-    var voiInitValues = tmp.slice(numPoints*2,tmp.length);
+    const indexs = getIndexesForLine(visualParams.num_points);
+    var tmp   = genInitArrays(visualParams.num_points);
+    var vertexs = tmp.slice(0,visualParams.num_points*2);
+    var voiInitValues = tmp.slice(visualParams.num_points*2,tmp.length);
 
     //Get canvases for axes
     const canvasX = document.getElementById("canvas_xAxis") as HTMLCanvasElement;
@@ -72,7 +71,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     // const ymin = gui.__folders.Visualization.__controllers[0].getValue()
 
     if (ctxY) {setY(ctxY, canvasY.width, canvasY.height, visualParams.voiMin, visualParams.voiMax, 10);}
-    if (ctxX) {setX(ctxX, canvasX.width, canvasX.height, 0, numPoints, 10);}
+    if (ctxX) {setX(ctxX, canvasX.width, canvasX.height, 0, visualParams.num_points * visualParams.plot_dt, 10);}
 
     // create buffers 
 
@@ -83,7 +82,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     const visualParamsArray = new Float32Array(Object.values(visualParams))
 
     const numberOfIndexes  = indexs.length;
-    // const numberVoiValues = numPoints;
+    // const numberVoiValues = visualParams.num_points;
     const vertexBuffer     = createGPUBuffer(device, vertexs);
     const indexBuffer      = createGPUBufferUint(device, indexs);
     const voiBuffer        = createGPUBuffer(device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
@@ -226,7 +225,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
                     resource: {
                         buffer: voiBuffer,
                         offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * numPoints,
+                        size: Float32Array.BYTES_PER_ELEMENT * visualParams.num_points,
                     },
                 },
                 {
@@ -325,7 +324,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(computePipeline);
             passEncoder.setBindGroup(0, computeBindGroup);
-            passEncoder.dispatchWorkgroups(Math.ceil(numPoints / 64));
+            passEncoder.dispatchWorkgroups(Math.ceil(visualParams.num_points / 64));
             passEncoder.end();
         }
         {   //Render Update

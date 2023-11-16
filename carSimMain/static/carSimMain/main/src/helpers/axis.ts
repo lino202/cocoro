@@ -35,11 +35,11 @@ export const setX = (
       const x = width - ((i / divs) * width);
   
         if (i==0){
-            ctx2d.textAlign = "right";
+          ctx2d.textAlign = "right";
         }else if (i==divs){
-            ctx2d.textAlign = "left";
+          ctx2d.textAlign = "left";
         }else{
-            ctx2d.textAlign = "center";
+          ctx2d.textAlign = "center";
         }
       
       ctx2d.fillText(`t-${Number.parseFloat(midpoint.toString()).toFixed(1)}`, x, 26);
@@ -68,11 +68,11 @@ export const setY = (
     const y = (i / divs) * height;
 
     if (i==0){
-        ctx2d.textBaseline = "top";
+      ctx2d.textBaseline = "top";
     }else if (i==divs){
-        ctx2d.textBaseline = "bottom";
+      ctx2d.textBaseline = "bottom";
     }else{
-        ctx2d.textBaseline = "middle";
+      ctx2d.textBaseline = "middle";
     }
     
     ctx2d.fillText(`${Number.parseFloat(midpoint.toString()).toFixed(2)}`, 0, y, width);

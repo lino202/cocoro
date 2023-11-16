@@ -1,3 +1,5 @@
+#include "./common.wgsl";
+
 struct States {
     u  : f32,
     v  : f32,
@@ -23,23 +25,6 @@ struct Constants {
     tau_si       : f32,
     tau_w_minus  : f32,
     tau_w_plus   : f32,
-}
-
-struct Stim {
-    period : f32,
-    amp: f32,
-    dur: f32,
-    start: f32
-}
-
-struct Integration {
-    dt : f32,
-}
-
-struct VisualParams {
-    voi_max : f32,
-    voi_min : f32,
-    plot_dt : f32,        
 }
 
 @binding(0) @group(0) var<storage, read_write> vois : array<f32>;
@@ -119,11 +104,11 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
         states.t += integ.dt;
 
-        // if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
-        vois[idx] = ((vois[idx] - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min)) * 2 - 1;
-        // }else{
-        //     vois[idx] = 1.0; //Plot in magenta overflow, nan or inf
-        // }
+        if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
+            vois[idx] = ((vois[idx] - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min)) * 2 - 1;
+        }else{
+            vois[idx] = 1.0; //Plot a line in the top if this overflows
+        }
 
         if ( trunc(states.t/visual_params.plot_dt) != current_compute_interval) {break;}
     }
