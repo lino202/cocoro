@@ -2,8 +2,8 @@
 
 import { checkWebGPU } from './helpers/helper';
 import { SimCell } from './main_modules/simCell';
-import {cellTypesFK, cellModelParamsFKBR, cellModelParamsFKMBR, cellModelParamsFKGP, cellModelParamsFKMLR1} from './cellModels/fenton_karma'
-import {cellTypesGaur, cellModelParamsGaur} from './cellModels/gaur'
+import {cellTypesFK, cellModelParamsFKBR, cellModelParamsFKMBR, cellModelParamsFKGP, cellModelParamsFKMLR1} from './cellModels/fenton_karma_init'
+import {cellTypesGaur, cellModelParamsGaur} from './cellModels/gaur_init'
 import { GUI } from 'dat.gui';
 import $ from 'jquery';
 
@@ -95,13 +95,13 @@ function changeCellModel(this: any){
         stim      = cellModelParamsFKBR.stim;
     }else if (cellTypes[0] == 'GP'){
         constants = cellModelParamsFKGP.constants;
-        stim      = cellModelParamsFKBR.stim;
+        stim      = cellModelParamsFKGP.stim;
     }else if (cellTypes[0] == 'MBR'){
         constants = cellModelParamsFKMBR.constants;
-        stim      = cellModelParamsFKBR.stim;
+        stim      = cellModelParamsFKMBR.stim;
     }else if (cellTypes[0] == 'MLR-1'){
         constants = cellModelParamsFKMLR1.constants;
-        stim      = cellModelParamsFKBR.stim;
+        stim      = cellModelParamsFKMLR1.stim;
     }else if (cellTypes[0] == 'GaurUnique'){
         constants = cellModelParamsGaur.constants;
         stim      = cellModelParamsGaur.stim;

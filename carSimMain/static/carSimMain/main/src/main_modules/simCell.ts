@@ -1,9 +1,7 @@
-import { initGPU, createGPUBuffer} from '../helpers/helper';
-import { createGPUBufferUint } from '../helpers/helper';
-import renderShaders from '../cellModels/plot2DShaders.wgsl';
+import { initGPU, createGPUBuffer, createGPUBufferUint} from '../helpers/helper';
+import { renderVertexFragmentShaders } from '../cellModels/plot2DShaders.js';
 import { initCanvas, setY, setX } from '../helpers/axis';
-import computeGaurShader from '../cellModels/gaur.wgsl';
-import computeFKShader from '../cellModels/fenton_karma.wgsl';
+import { computeCellModel } from '../cellModels/computeCellModel.js'
 import { GUI } from 'dat.gui';
 
 
@@ -93,7 +91,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     layout: 'auto',
     vertex: {
         module: device.createShaderModule({                    
-            code: renderShaders
+            code: renderVertexFragmentShaders
         }),
         entryPoint: "vs_main",
         buffers:[
@@ -123,7 +121,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     },
     fragment: {
         module: device.createShaderModule({                    
-            code: renderShaders
+            code: renderVertexFragmentShaders
         }),
         entryPoint: "fs_main",
         targets: [
@@ -196,22 +194,12 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     //     size: resultsBufferSize,
     //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     // });
-
-    var computeShader;
-    if (cellModel == 'Fenton_Karma'){
-        computeShader = computeFKShader;
-    }else if (cellModel == 'Gaur'){
-        computeShader = computeGaurShader;
-    }else{
-        throw new Error(`Unknown Cell Model "${cellModel}"`)
-    }
  
-
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShader,
+            code: computeCellModel(cellModel),
           }),
           entryPoint: 'comp_main',
         },

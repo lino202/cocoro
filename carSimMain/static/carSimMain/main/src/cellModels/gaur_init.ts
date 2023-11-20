@@ -35,6 +35,7 @@ export const cellModelParamsGaur = {
         t : 0
     },
     constants:{
+        cm : 1,
         cell__F : 96485.0,
         CaMK__KmCaMK : 0.065,
         CICR__SOICR : 10.0,
