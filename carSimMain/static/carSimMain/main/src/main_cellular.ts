@@ -18,15 +18,34 @@ const visualParams = {
     plot_dt  : 1,     // This should be in ms if dt is in ms
     num_points : 3000
 }
-const gui             = new GUI();
+const gui = new GUI();
 
 $('#btn-simulate').on('click',()=>{
-    const cellModel = gui.__folders.Simulation.__controllers[0].getValue()
-    const cellType = gui.__folders.Simulation.__controllers[1].getValue()
+    var cellModelController = gui.__folders.Simulation.__controllers[0];
+    var cellTypeController  = gui.__folders.Simulation.__controllers[1];
+    const cellModel         = cellModelController.getValue();
+    const cellType          = cellTypeController.getValue();
     var params;
 
-    // Also period is not working if not with the default fentonKarma so I think there's no more connection between
-    // gui and buffers when it is not the default I suspeect it might be due to the switching I do here
+    // Disable things (visualization and cell model name and type)
+    const visControllers = gui.__folders.Visualization.__controllers;
+    for (let i=0; i<visControllers.length; i++){
+        var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = visControllers[i].domElement.querySelector('input');
+        if (controllerDomElement != null){
+            controllerDomElement.disabled = true;
+        }
+    }
+    var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = cellModelController.domElement.querySelector('select');
+    if (controllerDomElement != null){
+        controllerDomElement.disabled = true;
+    }
+    var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = cellTypeController.domElement.querySelector('select');
+    if (controllerDomElement != null){
+        controllerDomElement.disabled = true;
+    }
+
+
+    // Load the params from cell model and type
     if (cellModel == 'Fenton_Karma'){
         if (cellType == 'BR'){
             params = cellModelParamsFKBR;
@@ -85,7 +104,7 @@ function changeCellModel(this: any){
         stim      = cellModelParamsFKBR.stim;
     }else if (cellTypes[0] == 'GaurUnique'){
         constants = cellModelParamsGaur.constants;
-        stim      = cellModelParamsFKBR.stim;
+        stim      = cellModelParamsGaur.stim;
     }else{
         throw new Error(`Unknown Cell Type "${cellTypes[0]}"`)
     }

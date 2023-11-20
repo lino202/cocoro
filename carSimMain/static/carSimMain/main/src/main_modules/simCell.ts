@@ -2,7 +2,7 @@ import { initGPU, createGPUBuffer} from '../helpers/helper';
 import { createGPUBufferUint } from '../helpers/helper';
 import renderShaders from '../cellModels/plot2DShaders.wgsl';
 import { initCanvas, setY, setX } from '../helpers/axis';
-// import computeGaurShader from '../cellModels/gaur.wgsl';
+import computeGaurShader from '../cellModels/gaur.wgsl';
 import computeFKShader from '../cellModels/fenton_karma.wgsl';
 import { GUI } from 'dat.gui';
 
@@ -200,8 +200,8 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     var computeShader;
     if (cellModel == 'Fenton_Karma'){
         computeShader = computeFKShader;
-    // }else if (cellModel == 'Gaur'){
-    //     computeShader = computeGaurShader;
+    }else if (cellModel == 'Gaur'){
+        computeShader = computeGaurShader;
     }else{
         throw new Error(`Unknown Cell Model "${cellModel}"`)
     }
@@ -278,8 +278,6 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
             ],
     });
 
-
-    // TODO visual Params in gui might be blocked when simulating as they cannot be changed there
     device.queue.writeBuffer(
         visualParamsBuffer,
         0,

@@ -1,4 +1,4 @@
-#include "/common.wgsl";
+#include "./common.wgsl";
 
 struct States {
     CICR__A : f32,
@@ -130,8 +130,6 @@ struct Constants {
 
 var<private> current_compute_interval: f32;
 
-// TODO check the piecewise function and implement
-
 @compute @workgroup_size(64)
 fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     
@@ -192,9 +190,19 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         
         // Actually compute the ionic model 
         // New subvariables are defined and currents have the prefix curr_
-        var CICR__diff_A:f32 = piecewise({states.CICR__tjsrol<5.00000,  - states.CICR__A/0.100000 }, 1.00000);
+        var CICR__diff_A:f32;
+        if (states.CICR__tjsrol<5.0){
+            CICR__diff_A = -states.CICR__A/0.1;
+        } else {
+            CICR__diff_A = 1.0;
+        }
 
-        var CICR__diff_tjsrol:f32 = piecewise({states.ionic_concentrations__cajsr>constants.CICR__SOICR&states.CICR__A>45.0000,  - states.CICR__tjsrol/0.00100000 }, 1.00000);
+        var CICR__diff_tjsrol:f32;
+        if ((states.ionic_concentrations__cajsr>constants.CICR__SOICR) & (states.CICR__A>45.0)){
+            CICR__diff_tjsrol = -states.CICR__tjsrol/0.001;
+        } else {
+            CICR__diff_tjsrol = 1.0;
+        }
 
         var INaL__hl_inf:f32 = 1.00000/(1.00000+exp((states.cell__v+91.0000)/6.10000));
 
@@ -222,7 +230,12 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var IKs__tau_xs2:f32 = 1.00000/( 0.0100000*exp((states.cell__v - 50.0000)/20.0000)+ 0.0193000*exp( - (states.cell__v+66.5400)/31.0000));
         var IKs__xs2_inf:f32 = IKs__xs1_inf;
 
-        var INaL__aml:f32 =  0.320000*piecewise({states.cell__v== - 47.1300, 10.0000 },  - (states.cell__v+47.1300)/(exp(  - 0.100000*(states.cell__v+47.1300)) - 1.00000));
+        var INaL__aml:f32;
+        if (states.cell__v == -47.1300) {
+            INaL__aml =  0.32 * 10.0;
+        } else {
+            INaL__aml =  0.32 * -((states.cell__v+47.13)/(exp(-0.1*(states.cell__v+47.13)) - 1.00000));
+        }
         var INaL__bml:f32 =  0.0800000*exp( - states.cell__v/11.0000);
         var INaL__ml_inf:f32 = INaL__aml/(INaL__aml+INaL__bml);
         var INaL__tau_ml:f32 = 1.00000/(INaL__aml+INaL__bml);
@@ -237,33 +250,55 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var CaMK__diff_CaMKt:f32 =  ( constants.CaMK__aCaMK*CaMK__CaMKb)*(CaMK__CaMKb+states.CaMK__CaMKt) -  constants.CaMK__bCaMK*states.CaMK__CaMKt;
 
         var I_Na__h_inf:f32 = 1.00000/( (1.00000+exp((states.cell__v+71.5500)/7.43000))*(1.00000+exp((states.cell__v+71.5500)/7.43000)));
-        var I_Na__aa_h:f32 = piecewise({states.cell__v>= - 40.0000, 0.00000 },  0.0570000*exp( - (states.cell__v+80.0000)/6.80000));
-        var I_Na__bb_h:f32 = piecewise({states.cell__v>= - 40.0000, 0.770000/( 0.130000*(1.00000+exp( - (states.cell__v+10.6600)/11.1000))) },  2.70000*exp( 0.0790000*states.cell__v)+ 310000.*exp( 0.348500*states.cell__v));
+        var I_Na__aa_h:f32;
+        var I_Na__bb_h:f32;
+        var I_Na__aa_j:f32;
+        var I_Na__bb_j:f32;
+        if (states.cell__v >= -40.0) {
+            I_Na__aa_h =  0.0;
+            I_Na__bb_h =  0.770000/( 0.130000*(1.00000+exp(-(states.cell__v+10.6600)/11.1000)));
+            I_Na__aa_j =  0.0;
+            I_Na__bb_j = ( 0.600000*exp( 0.0570000*states.cell__v))/(1.00000+exp(  - 0.100000*(states.cell__v+32.0000)));
+        } else {
+            I_Na__aa_h =  0.057*exp(-(states.cell__v+80.0)/6.8);
+            I_Na__bb_h =  2.70000*exp( 0.0790000*states.cell__v)+ 310000.*exp( 0.348500*states.cell__v);
+            I_Na__aa_j = ( (  - 25428.0*exp( 0.244400*states.cell__v) -  6.94800e-06*exp(  - 0.0439100*states.cell__v))*(states.cell__v+37.7800))/(1.00000+exp( 0.311000*(states.cell__v+79.2300)));
+            I_Na__bb_j = ( 0.0242400*exp(  - 0.0105200*states.cell__v))/(1.00000+exp(  - 0.137800*(states.cell__v+40.1400)));
+        }
         var I_Na__tau_h:f32 = 1.00000/(I_Na__aa_h+I_Na__bb_h);
-        
         var I_Na__j_inf:f32 = I_Na__h_inf;
-        var I_Na__aa_j:f32 = piecewise({states.cell__v>= - 40.0000, 0.00000 }, ( (  - 25428.0*exp( 0.244400*states.cell__v) -  6.94800e-06*exp(  - 0.0439100*states.cell__v))*(states.cell__v+37.7800))/(1.00000+exp( 0.311000*(states.cell__v+79.2300))));
-        var I_Na__bb_j:f32 = piecewise({states.cell__v>= - 40.0000, ( 0.600000*exp( 0.0570000*states.cell__v))/(1.00000+exp(  - 0.100000*(states.cell__v+32.0000))) }, ( 0.0242400*exp(  - 0.0105200*states.cell__v))/(1.00000+exp(  - 0.137800*(states.cell__v+40.1400))));
         var I_Na__tau_j:f32 = 1.00000/(I_Na__aa_j+I_Na__bb_j);
         
         var CaMK__vfrt:f32 = ( states.cell__v*constants.cell__F)/( constants.cell__R*constants.cell__T);
-        var ICaL__PhiCaL:f32 =  ( ( 2.00000*constants.cell__F)*( states.ionic_concentrations__cass*exp( 2.00000*(( states.cell__v*constants.cell__F)/( constants.cell__R*constants.cell__T))) -  0.341000*cell__cao))*piecewise({states.cell__v==0.00000, 1.00000 }, ( 2.00000*CaMK__vfrt)/(exp( 2.00000*CaMK__vfrt) - 1.00000));
+        var ICaL__PhiCaL:f32;
+        if (states.cell__v==0.0) {
+            ICaL__PhiCaL =  ( ( 2.00000*constants.cell__F)*( states.ionic_concentrations__cass*exp( 2.00000*(( states.cell__v*constants.cell__F)/( constants.cell__R*constants.cell__T))) -  0.341000*cell__cao))* 1.0 ;
+        } else {
+            ICaL__PhiCaL =  ( ( 2.00000*constants.cell__F)*( states.ionic_concentrations__cass*exp( 2.00000*(( states.cell__v*constants.cell__F)/( constants.cell__R*constants.cell__T))) -  0.341000*cell__cao))*( 2.00000*CaMK__vfrt)/(exp( 2.00000*CaMK__vfrt) - 1.00000);
+        }
+        
         var ICaL__f:f32 =  states.ICaL__ff*states.ICaL__fs;
         var curr_ICaL:f32 =  ( ( ( constants.ICaL__PCa*ICaL__PhiCaL)*states.ICaL__d)*ICaL__f)*states.ICaL__fca;
-        var ICaL__fca_inf:f32 = (0.300000/(1.00000 - piecewise({curr_ICaL>0.00000, 0.00000 }, curr_ICaL/0.0500000))+0.550000/(1.00000+states.ionic_concentrations__cass/0.00300000))+0.150000;
+        var ICaL__fca_inf:f32;
+        if (curr_ICaL > 0.0) {
+            ICaL__fca_inf = (0.300000/(1.00000 - 0.0)+0.550000/(1.00000+states.ionic_concentrations__cass/0.00300000))+0.150000;
+        } else {
+            ICaL__fca_inf = (0.300000/(1.00000 - curr_ICaL/0.0500000)+0.550000/(1.00000+states.ionic_concentrations__cass/0.00300000))+0.150000;
+        }
+        
         var CaMK__CaMKa:f32 = CaMK__CaMKb+states.CaMK__CaMKt;
         var CaMK__CaMK_f:f32 = 1.00000/(1.00000+constants.CaMK__KmCaMK/CaMK__CaMKa);
         var ICaL__tau_fca:f32 = ( 10.0000*CaMK__CaMK_f+0.500000)+1.00000/(1.00000+states.ionic_concentrations__cass/0.00300000);
         
         var CaMK__EK:f32 =  (( constants.cell__R*constants.cell__T)/constants.cell__F)*log(constants.cell__ko/states.ionic_concentrations__ki);
         var IK1__rk1:f32 = 1.00000/(1.00000+exp(((states.cell__v+79.3000) -  2.60000*constants.cell__ko)/19.6000));
-        var curr_IK1:f32 =  ( ( constants.IK1__GK1*power((constants.cell__ko/5.40000), 1.0 / 2))*IK1__rk1)*(states.cell__v - CaMK__EK);
+        var curr_IK1:f32 =  ( ( constants.IK1__GK1*pow((constants.cell__ko/5.40000), 1.0 / 2))*IK1__rk1)*(states.cell__v - CaMK__EK);
         var IKb__xkb:f32 = 1.00000/(1.00000+exp( - (states.cell__v - 14.4800)/18.3400));
         var curr_IKb:f32 =  ( constants.IKb__GKb*IKb__xkb)*(states.cell__v - CaMK__EK);
         var IKr__rkr:f32 = 1.00000/(1.00000+exp((states.cell__v+22.0000)/15.0000));
-        var curr_IKr:f32 =  ( ( ( constants.IKr__GKr*power((constants.cell__ko/5.40000), 1.0 / 2))*states.IKr__xr)*IKr__rkr)*(states.cell__v - CaMK__EK);
+        var curr_IKr:f32 =  ( ( ( constants.IKr__GKr*pow((constants.cell__ko/5.40000), 1.0 / 2))*states.IKr__xr)*IKr__rkr)*(states.cell__v - CaMK__EK);
         var CaMK__EKs:f32 =  (( constants.cell__R*constants.cell__T)/constants.cell__F)*log((constants.cell__ko+ constants.CaMK__PKNa*constants.cell__nao)/(states.ionic_concentrations__ki+ constants.CaMK__PKNa*states.ionic_concentrations__nai));
-        var IKs__KsCa:f32 = 1.00000+0.600000/(1.00000+power(3.80000e-05/states.ionic_concentrations__cai, 1.40000));
+        var IKs__KsCa:f32 = 1.00000+0.600000/(1.00000+pow(3.80000e-05/states.ionic_concentrations__cai, 1.40000));
         var curr_IKs:f32 =  ( ( ( constants.IKs__GKs*IKs__KsCa)*states.IKs__xs1)*states.IKs__xs2)*(states.cell__v - CaMK__EKs);
         var INaK__Knai:f32 =  constants.INaK__Knai0*exp(( ( constants.INaK__delta*states.cell__v)*constants.cell__F)/( ( 3.00000*constants.cell__R)*constants.cell__T));
         var INaK__a1:f32 = ( constants.INaK__k1p*( ( (states.ionic_concentrations__nai/INaK__Knai)*(states.ionic_concentrations__nai/INaK__Knai))*(states.ionic_concentrations__nai/INaK__Knai)))/(( ( (1.00000+states.ionic_concentrations__nai/INaK__Knai)*(1.00000+states.ionic_concentrations__nai/INaK__Knai))*(1.00000+states.ionic_concentrations__nai/INaK__Knai)+ (1.00000+states.ionic_concentrations__ki/constants.INaK__Kki)*(1.00000+states.ionic_concentrations__ki/constants.INaK__Kki)) - 1.00000);
@@ -287,7 +322,12 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var diffusion__JdiffK:f32 = (states.ionic_concentrations__kss - states.ionic_concentrations__ki)/2.00000;
         var ionic_concentrations__diff_ki:f32 = (  - ((((curr_IKr+curr_IKs)+curr_IK1)+curr_IKb) -  2.00000*curr_INaK)*cell__Acap)/( ( 2.00000*constants.cell__F)*cell__vmyo)+( diffusion__JdiffK*cell__vss)/cell__vmyo;
 
-        var ICaL__PhiCaK:f32 =  ( constants.cell__F*( ( 0.750000*states.ionic_concentrations__kss)*exp(CaMK__vfrt) -  0.750000*constants.cell__ko))*piecewise({states.cell__v==0.00000, 1.00000 }, CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000));
+        var ICaL__PhiCaK:f32;
+        if (states.cell__v==0.0) {
+            ICaL__PhiCaK = ( constants.cell__F*( ( 0.750000*states.ionic_concentrations__kss)*exp(CaMK__vfrt) -  0.750000*constants.cell__ko))*1.0;
+        } else {
+            ICaL__PhiCaK = ( constants.cell__F*( ( 0.750000*states.ionic_concentrations__kss)*exp(CaMK__vfrt) -  0.750000*constants.cell__ko))*CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000);
+        }     
         var curr_ICaK:f32 =  ( ( ( ICaL__PCaK*ICaL__PhiCaK)*states.ICaL__d)*ICaL__f)*states.ICaL__fca;
         var ionic_concentrations__diff_kss:f32 = (  - curr_ICaK*cell__Acap)/( ( 2.00000*constants.cell__F)*cell__vss) - diffusion__JdiffK;
         
@@ -325,7 +365,12 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var curr_INaCa_i:f32 =  ( ( 0.800000*constants.INaCa_i__Gncx)*INaCa_i__allo)*( constants.INaCa_i__zna*INaCa_i__JncxNa+ constants.ICaL__zca*INaCa_i__JncxCa);
         var CaMK__ENa:f32 =  (( constants.cell__R*constants.cell__T)/constants.cell__F)*log(constants.cell__nao/states.ionic_concentrations__nai);
         var curr_INaL:f32 =  ( ( ( ( constants.INaL__GNaL*states.INaL__ml)*states.INaL__ml)*states.INaL__ml)*states.INaL__hl)*(states.cell__v - CaMK__ENa);
-        var curr_INab:f32 =  ( ( constants.INab__PNab*constants.cell__F)*( states.ionic_concentrations__nai*exp(CaMK__vfrt) - constants.cell__nao))*piecewise({states.cell__v==0.00000, 1.00000 }, CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000));
+        var curr_INab:f32;
+        if (states.cell__v==0.0) {
+            curr_INab = ( ( constants.INab__PNab*constants.cell__F)*( states.ionic_concentrations__nai*exp(CaMK__vfrt) - constants.cell__nao))*1.0;
+        } else {
+            curr_INab = ( ( constants.INab__PNab*constants.cell__F)*( states.ionic_concentrations__nai*exp(CaMK__vfrt) - constants.cell__nao))*CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000);
+        }
         var curr_INa:f32 =  ( ( ( ( ( constants.I_Na__GNa*states.I_Na__m)*states.I_Na__m)*states.I_Na__m)*states.I_Na__h)*states.I_Na__j)*(states.cell__v - CaMK__ENa);
         var diffusion__JdiffNa:f32 = (states.ionic_concentrations__nass - states.ionic_concentrations__nai)/2.00000;
         var ionic_concentrations__diff_nai:f32 = (  - ((((curr_INa+curr_INaL)+ 3.00000*curr_INaCa_i)+ 3.00000*curr_INaK)+curr_INab)*cell__Acap)/( ( 2.00000*constants.cell__F)*cell__vmyo)+( diffusion__JdiffNa*cell__vss)/cell__vmyo;
@@ -360,11 +405,21 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         var INaCa_ss__JncxNa1:f32 = ( 3.00000*( INaCa_ss__E41*INaCa_ss__k71 -  INaCa_ss__E11*INaCa_ss__k81)+ INaCa_ss__E31*INaCa_ss__k4pp1) -  INaCa_ss__E21*INaCa_ss__k3pp1;
         var INaCa_ss__allo1:f32 = 1.00000/(1.00000+ (constants.INaCa_i__KmCaAct/states.ionic_concentrations__cass)*(constants.INaCa_i__KmCaAct/states.ionic_concentrations__cass));
         var curr_INaCa_ss:f32 =  ( ( 0.200000*constants.INaCa_i__Gncx)*INaCa_ss__allo1)*( constants.INaCa_i__zna*INaCa_ss__JncxNa1+ constants.ICaL__zca*INaCa_ss__JncxCa1);
-        var ICaL__PhiCaNa:f32 =  ( constants.cell__F*( ( 0.750000*states.ionic_concentrations__nass)*exp(CaMK__vfrt) -  0.750000*constants.cell__nao))*piecewise({states.cell__v==0.00000, 1.00000 }, CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000));
+        var ICaL__PhiCaNa:f32;
+        if (states.cell__v==0.0) {
+            ICaL__PhiCaNa = ( constants.cell__F*( ( 0.750000*states.ionic_concentrations__nass)*exp(CaMK__vfrt) -  0.750000*constants.cell__nao))*1.0;
+        } else {
+            ICaL__PhiCaNa = ( constants.cell__F*( ( 0.750000*states.ionic_concentrations__nass)*exp(CaMK__vfrt) -  0.750000*constants.cell__nao))*CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000);
+        }
         var curr_ICaNa:f32 =  ( ( ( ICaL__PCaNa*ICaL__PhiCaNa)*states.ICaL__d)*ICaL__f)*states.ICaL__fca;
         var ionic_concentrations__diff_nass:f32 = (  - (curr_ICaNa+ 3.00000*curr_INaCa_ss)*cell__Acap)/( ( 2.00000*constants.cell__F)*cell__vss) - diffusion__JdiffNa;
 
-        var curr_ICab:f32 =  ( ( ( constants.ICab__PCab*2.00000)*constants.cell__F)*( states.ionic_concentrations__cai*exp( 2.00000*CaMK__vfrt) -  0.341000*cell__cao))*piecewise({states.cell__v==0.00000, 1.00000 }, ( 2.00000*CaMK__vfrt)/(exp( 2.00000*CaMK__vfrt) - 1.00000));
+        var curr_ICab:f32;
+        if (states.cell__v==0.0) {
+            curr_ICab = ( ( ( constants.ICab__PCab*2.00000)*constants.cell__F)*( states.ionic_concentrations__cai*exp( 2.00000*CaMK__vfrt) -  0.341000*cell__cao))*1.0;
+        } else {
+            curr_ICab = ( ( ( constants.ICab__PCab*2.00000)*constants.cell__F)*( states.ionic_concentrations__cai*exp( 2.00000*CaMK__vfrt) -  0.341000*cell__cao))*( 2.00000*CaMK__vfrt)/(exp( 2.00000*CaMK__vfrt) - 1.00000);
+        }
         var CICR__greljsrol:f32 =  ( constants.CICR__grelbarjsrol*(1.00000 - exp( - states.CICR__tjsrol/constants.CICR__tauon)))*exp( - states.CICR__tjsrol/constants.CICR__tauoff);
         var CICR__Jrelol:f32 =  CICR__greljsrol*(states.ionic_concentrations__cajsr - states.ionic_concentrations__cass);
         var CICR__Jrel:f32 = states.CICR__Jrel1+CICR__Jrelol;
@@ -395,16 +450,26 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
         var diffusion__Jdiff:f32 = (states.ionic_concentrations__cass - states.ionic_concentrations__cai)/0.200000;
         var CICR__Rel1:f32 = ( ( - curr_ICaL+ 2.00000*curr_INaCa_ss)*(cell__Acap/( ( 2.00000*cell__vss)*constants.cell__F))+ CICR__Jrel*(cell__vjsr/cell__vss)) - diffusion__Jdiff;
-        var CICR__Jrel1_inf:f32 = piecewise({CICR__Rel1>0.00000, ( ( ( 1.00000*60.0000)*CICR__Rel1)*(1.00000+1.00000/(1.00000+power(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000))))/(1.00000+power(0.750000/states.ionic_concentrations__cajsr, 8.00000)) }, 0.00000);
-        var CICR__trel1factor:f32 = ( ( 1.00000*20.0000)*(1.00000+1.00000/(1.00000+power(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000))))/(1.00000+power(0.500000/states.ionic_concentrations__cajsr, 8.00000));
-        var CICR__tau_Jrel1:f32 = piecewise({0.00100000>CICR__trel1factor, 0.00100000 }, CICR__trel1factor);
+        var CICR__Jrel1_inf:f32;
+        if (CICR__Rel1>0.00000) {
+            CICR__Jrel1_inf =  ( ( ( 1.00000*60.0000)*CICR__Rel1)*(1.00000+1.00000/(1.00000+pow(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000))))/(1.00000+pow(0.750000/states.ionic_concentrations__cajsr, 8.00000));
+        } else {
+            CICR__Jrel1_inf = 0.0;
+        }
+        var CICR__trel1factor:f32 = ( ( 1.00000*20.0000)*(1.00000+1.00000/(1.00000+pow(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000))))/(1.00000+pow(0.500000/states.ionic_concentrations__cajsr, 8.00000));
+        var CICR__tau_Jrel1:f32 = max(0.001,CICR__trel1factor);
 
         var CICR__Jgap:f32 = (states.ionic_concentrations__cai - states.ionic_concentrations__cai2)/constants.CICR__tau_gap;
         var CICR__Rel2:f32 = (CICR__Jgap+ states.CICR__Jrel2*(cell__vcsr/cell__vmyo2)) -  SR_uptake__Jup2*(cell__vnsr2/cell__vmyo2);
-        var CICR__Jrel2_inf:f32 = piecewise({CICR__Rel2>0.00000, ( 1.00000*( ( 250.000*CICR__Rel2)*(1.00000+1.00000/(1.00000+power(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000)))))/(1.00000+power(0.750000/states.ionic_concentrations__cacsr, 8.00000)) }, 0.00000);
-        var CICR__trel2factor:f32 = ( 50.0000*(1.00000+1.00000/(1.00000+power(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000))))/(1.00000+power(0.500000/states.ionic_concentrations__cacsr, 8.00000));
-        var CICR__tau_Jrel2:f32 = piecewise({0.00100000>CICR__trel2factor, 0.00100000 }, CICR__trel2factor);
-
+        var CICR__Jrel2_inf:f32;
+        if (CICR__Rel2>0.0) {
+            CICR__Jrel2_inf = ( 1.00000*( ( 250.000*CICR__Rel2)*(1.00000+1.00000/(1.00000+pow(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000)))))/(1.00000+pow(0.750000/states.ionic_concentrations__cacsr, 8.00000));
+        } else {
+            CICR__Jrel2_inf = 0.0;
+        }
+        var CICR__trel2factor:f32 = ( 50.0000*(1.00000+1.00000/(1.00000+pow(constants.CaMK__KmCaMK/CaMK__CaMKa, 8.00000))))/(1.00000+pow(0.500000/states.ionic_concentrations__cacsr, 8.00000));
+        var CICR__tau_Jrel2:f32 = max(0.001,CICR__trel2factor);
+        
         var ionic_concentrations__Bcai:f32 = 1.00000/((1.00000+( constants.SR_uptake__cmdnmax*constants.SR_uptake__kmcmdn)/( (constants.SR_uptake__kmcmdn+states.ionic_concentrations__cai)*(constants.SR_uptake__kmcmdn+states.ionic_concentrations__cai)))+( constants.SR_uptake__trpnmax*constants.SR_uptake__kmtrpn)/( (constants.SR_uptake__kmtrpn+states.ionic_concentrations__cai)*(constants.SR_uptake__kmtrpn+states.ionic_concentrations__cai)));
         var ionic_concentrations__diff_cai:f32 =  ionic_concentrations__Bcai*((((  - ((curr_IpCa+curr_ICab) -  2.00000*curr_INaCa_i)*cell__Acap)/( ( ( 2.00000*2.00000)*constants.cell__F)*cell__vmyo1) - ( SR_uptake__Jup*cell__vnsr1)/cell__vmyo1)+( diffusion__Jdiff*cell__vss)/cell__vmyo1) - CICR__Jgap);
 
@@ -416,36 +481,36 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
 
 
         // Update with Fordward Euler for non-gating variables
-        states.CICR__A                     = states.CICR__A                     + dt * CICR__diff_A;
-        states.CICR__tjsrol                = states.CICR__tjsrol                + dt * CICR__diff_tjsrol;
-        states.CaMK__CaMKt                 = states.CaMK__CaMKt                 + dt * CaMK__diff_CaMKt;
-        states.ionic_concentrations__ki    = states.ionic_concentrations__ki    + dt * ionic_concentrations__diff_ki;
-        states.ionic_concentrations__kss   = states.ionic_concentrations__kss   + dt * ionic_concentrations__diff_kss; 
-        states.ionic_concentrations__nai   = states.ionic_concentrations__nai   + dt * ionic_concentrations__diff_nai;
-        states.ionic_concentrations__nass  = states.ionic_concentrations__nass  + dt * ionic_concentrations__diff_nass;
-        states.ionic_concentrations__cajsr = states.ionic_concentrations__cajsr + dt * ionic_concentrations__diff_cajsr;
-        states.ionic_concentrations__cacsr = states.ionic_concentrations__cacsr + dt * ionic_concentrations__diff_cacsr;
-        states.ionic_concentrations__cansr = states.ionic_concentrations__cansr + dt * ionic_concentrations__diff_cansr;
-        states.ionic_concentrations__cai   = states.ionic_concentrations__cai   + dt * ionic_concentrations__diff_cai;
-        states.ionic_concentrations__cai2  = states.ionic_concentrations__cai2  + dt * ionic_concentrations__diff_cai2;
-        states.ionic_concentrations__cass  = states.ionic_concentrations__cass  + dt * ionic_concentrations__diff_cass;
+        states.CICR__A                     = states.CICR__A                     + integ.dt * CICR__diff_A;
+        states.CICR__tjsrol                = states.CICR__tjsrol                + integ.dt * CICR__diff_tjsrol;
+        states.CaMK__CaMKt                 = states.CaMK__CaMKt                 + integ.dt * CaMK__diff_CaMKt;
+        states.ionic_concentrations__ki    = states.ionic_concentrations__ki    + integ.dt * ionic_concentrations__diff_ki;
+        states.ionic_concentrations__kss   = states.ionic_concentrations__kss   + integ.dt * ionic_concentrations__diff_kss; 
+        states.ionic_concentrations__nai   = states.ionic_concentrations__nai   + integ.dt * ionic_concentrations__diff_nai;
+        states.ionic_concentrations__nass  = states.ionic_concentrations__nass  + integ.dt * ionic_concentrations__diff_nass;
+        states.ionic_concentrations__cajsr = states.ionic_concentrations__cajsr + integ.dt * ionic_concentrations__diff_cajsr;
+        states.ionic_concentrations__cacsr = states.ionic_concentrations__cacsr + integ.dt * ionic_concentrations__diff_cacsr;
+        states.ionic_concentrations__cansr = states.ionic_concentrations__cansr + integ.dt * ionic_concentrations__diff_cansr;
+        states.ionic_concentrations__cai   = states.ionic_concentrations__cai   + integ.dt * ionic_concentrations__diff_cai;
+        states.ionic_concentrations__cai2  = states.ionic_concentrations__cai2  + integ.dt * ionic_concentrations__diff_cai2;
+        states.ionic_concentrations__cass  = states.ionic_concentrations__cass  + integ.dt * ionic_concentrations__diff_cass;
         
         // Rush Larsen for gating variables
-        states.INaL__hl    = INaL__hl_inf    + (states.INaL__hl    - INaL__hl_inf)    * exp(-dt/constants.INaL__tau_hl);
-        states.INaL__ml    = INaL__ml_inf    + (states.INaL__ml    - INaL__ml_inf)    * exp(-dt/INaL__tau_ml);
-        states.I_Na__m     = I_Na__m_inf     + (states.I_Na__m     - I_Na__m_inf)     * exp(-dt/I_Na__tau_m);
-        states.I_Na__h     = I_Na__h_inf     + (states.I_Na__h     - I_Na__h_inf)     * exp(-dt/I_Na__tau_h);
-        states.I_Na__j     = I_Na__j_inf     + (states.I_Na__j     - I_Na__j_inf)     * exp(-dt/I_Na__tau_j);
-        states.ICaL__d     = ICaL__d_inf     + (states.ICaL__d     - ICaL__d_inf)     * exp(-dt/ICaL__tau_d);
-        states.ICaL__fca   = ICaL__fca_inf   + (states.ICaL__fca   - ICaL__fca_inf)   * exp(-dt/ICaL__tau_fca);
-        states.IKr__xr     = IKr__xr_inf     + (states.IKr__xr     - IKr__xr_inf)     * exp(-dt/IKr__tau_xr);
-        states.ITo__aa     = ITo__aa_inf     + (states.ITo__aa     - ITo__aa_inf)     * exp(-dt/ITo__tau_aa);
-        states.ICaL__ff    = ICaL__ff_inf    + (states.ICaL__ff    - ICaL__ff_inf)    * exp(-dt/ICaL__tau_ff);
-        states.ICaL__fs    = ICaL__fs_inf    + (states.ICaL__fs    - ICaL__fs_inf)    * exp(-dt/ICaL__tau_fs);
-        states.IKs__xs1    = IKs__xs1_inf    + (states.IKs__xs1    - IKs__xs1_inf)    * exp(-dt/IKs__tau_xs1);
-        states.IKs__xs2    = IKs__xs2_inf    + (states.IKs__xs2    - IKs__xs2_inf)    * exp(-dt/IKs__tau_xs2);
-        states.CICR__Jrel1 = CICR__Jrel1_inf + (states.CICR__Jrel1 - CICR__Jrel1_inf) * exp(-dt/CICR__tau_Jrel1);
-        states.CICR__Jrel2 = CICR__Jrel2_inf + (states.CICR__Jrel2 - CICR__Jrel2_inf) * exp(-dt/CICR__tau_Jrel2);
+        states.INaL__hl    = INaL__hl_inf    + (states.INaL__hl    - INaL__hl_inf)    * exp(-integ.dt/constants.INaL__tau_hl);
+        states.INaL__ml    = INaL__ml_inf    + (states.INaL__ml    - INaL__ml_inf)    * exp(-integ.dt/INaL__tau_ml);
+        states.I_Na__m     = I_Na__m_inf     + (states.I_Na__m     - I_Na__m_inf)     * exp(-integ.dt/I_Na__tau_m);
+        states.I_Na__h     = I_Na__h_inf     + (states.I_Na__h     - I_Na__h_inf)     * exp(-integ.dt/I_Na__tau_h);
+        states.I_Na__j     = I_Na__j_inf     + (states.I_Na__j     - I_Na__j_inf)     * exp(-integ.dt/I_Na__tau_j);
+        states.ICaL__d     = ICaL__d_inf     + (states.ICaL__d     - ICaL__d_inf)     * exp(-integ.dt/ICaL__tau_d);
+        states.ICaL__fca   = ICaL__fca_inf   + (states.ICaL__fca   - ICaL__fca_inf)   * exp(-integ.dt/ICaL__tau_fca);
+        states.IKr__xr     = IKr__xr_inf     + (states.IKr__xr     - IKr__xr_inf)     * exp(-integ.dt/IKr__tau_xr);
+        states.ITo__aa     = ITo__aa_inf     + (states.ITo__aa     - ITo__aa_inf)     * exp(-integ.dt/ITo__tau_aa);
+        states.ICaL__ff    = ICaL__ff_inf    + (states.ICaL__ff    - ICaL__ff_inf)    * exp(-integ.dt/ICaL__tau_ff);
+        states.ICaL__fs    = ICaL__fs_inf    + (states.ICaL__fs    - ICaL__fs_inf)    * exp(-integ.dt/ICaL__tau_fs);
+        states.IKs__xs1    = IKs__xs1_inf    + (states.IKs__xs1    - IKs__xs1_inf)    * exp(-integ.dt/IKs__tau_xs1);
+        states.IKs__xs2    = IKs__xs2_inf    + (states.IKs__xs2    - IKs__xs2_inf)    * exp(-integ.dt/IKs__tau_xs2);
+        states.CICR__Jrel1 = CICR__Jrel1_inf + (states.CICR__Jrel1 - CICR__Jrel1_inf) * exp(-integ.dt/CICR__tau_Jrel1);
+        states.CICR__Jrel2 = CICR__Jrel2_inf + (states.CICR__Jrel2 - CICR__Jrel2_inf) * exp(-integ.dt/CICR__tau_Jrel2);
 
         states.cell__v = states.cell__v - ((curr_Iion + i_stim)* integ.dt);  //cm is 1
         vois[idx] = states.cell__v;
@@ -464,25 +529,6 @@ fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     // results[idx] = vois[idx];
 }
 
-
-// Compute result of a piecewise function
-fn piecewise(cases:XX, default_value:XX) -> f32{
-    // set = [0];
-    // for i = 1:2:length(cases)
-    //     if (length(cases{i+1}) == 1)
-    //         x(cases{i} & ~set,:) = cases{i+1};
-    //     else
-    //         x(cases{i} & ~set,:) = cases{i+1}(cases{i} & ~set);
-    //     end
-    //     set = set | cases{i};
-    //     if(set), break, end
-    // end
-    // if (length(default_value) == 1)
-    //     x(~set,:) = default_value;
-    // else
-    //     x(~set,:) = default_value(~set);
-    // end
-}
 
 
 
