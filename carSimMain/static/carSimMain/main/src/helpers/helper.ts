@@ -1,6 +1,16 @@
 import { vec3, mat4 } from "gl-matrix";
 import { AddColors } from "./colorMap";
 
+
+export interface meshObj {
+    vertexs: Float32Array,
+    indexs:  Uint32Array,
+    normals: Float32Array,
+    meshType: string,
+    voiInitValues: Float32Array,
+    params: Float32Array
+}
+
 export const getDataFromDjango = (data:any) =>{
     const vertexs = new Float32Array(data.vertexs)
     const indexs = new Uint32Array(data.cells)
@@ -8,7 +18,15 @@ export const getDataFromDjango = (data:any) =>{
     const voiInitValues = new Float32Array(data.voiInitValues);
     const params = new Float32Array(data.params);
     const meshType = data.meshType;
-    return {vertexs, indexs, normals, meshType, voiInitValues, params};
+    var meshData:meshObj = {
+        vertexs: vertexs,
+        indexs:  indexs,
+        normals: normals,
+        meshType: meshType,
+        voiInitValues: voiInitValues,
+        params: params
+    }
+    return meshData;
 }
 
 export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0), isAnimation = true ) => {
@@ -153,4 +171,15 @@ export const checkWebGPU = () => {
         result = "Your current browser does not support WebGPU! :(";
     } 
     return result;
+}
+
+
+export function repeatFloat32Array(arr: Float32Array, n: number): Float32Array {
+    const concatenatedArray = new Float32Array(arr.length * n);
+
+    for (let i=0; i<n;i++){
+        concatenatedArray.set(arr, i*arr.length);    
+    }
+
+    return concatenatedArray;
 }

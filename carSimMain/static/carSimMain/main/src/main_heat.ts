@@ -1,20 +1,9 @@
-import { SimLineMonodomain} from './main_modules/simLineMonodomain';
-import { LightInputsInterface } from './helpers/mysettings';
+import { SimLineHeat} from './main_modules/simLineHeat';
+import { SimSurfHeat} from './main_modules/simSurfHeat';
 import { checkWebGPU, getDataFromDjango, meshObj } from './helpers/helper';
-import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
-import { GUI } from 'dat.gui';
 
-//  Global Variables ------------
-const visualParams = {
-    voiMax   : 60,
-    voiMin   : -100,
-    plot_dt  : 1,     // This should be in ms if dt is in ms
-    // num_points : 3000
-}
-const gui = new GUI();
 declare let djangodata: any;
-let li:LightInputsInterface = {};
 
 // Main ----------------
 (async () =>{
@@ -41,24 +30,23 @@ $('#btn-print-mesh-info').on('click',()=>{
 
 $(document).ready(function(){
     console.log("WE ARE READY!!");
-    initGUI4UniqueCellModel(gui, visualParams, "Tissue");
 });
 
-// TODO We need to add 2D and 3D as well as time update in simulation
-// gpu statistics as fps, AP plot at least of 1, and EXMs
 
-// TODO we might need to rewrite all in OOP
-
+//TODO heat is not working well for some reason
+// line has been corrected so great but is still in nan
+// and surface has to be rearranged for being compliant with line and new approach
+// also maybe 3D is possible if we put a newman condition instead of a boundary one
+// Correcting Heat is not priority
 $('#btn-simulate').on('click',()=>{
 
     const meshData:meshObj = getDataFromDjango(djangodata);
-    const cellObj:cellObj = manageDataFromGUI(gui, "Tissue");
 
     if (meshData.meshType == "triangle"){
-        console.log("Surface Monodomain Simulation")
-        // SimSurfMonodomain(gui, meshData, cellObj)        
+        console.log("Surface Heat Simulation")
+        SimSurfHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
     }else if (meshData.meshType == "line") {
-        console.log("Line Monodomain Simulation")
-        SimLineMonodomain(gui, meshData, cellObj)
+        console.log("Line Heat Simulation")
+        SimLineHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
     }
 });

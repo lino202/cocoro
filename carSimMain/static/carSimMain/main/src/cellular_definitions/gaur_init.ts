@@ -35,7 +35,10 @@ export const cellModelParamsGaur = {
         t : 0
     },
     constants:{
-        cm : 1,
+        cm : 1,           //units uF/cm2
+        beta: 0.14,       //units 1/um as we follow openCARP, in this model Ageo and Vcell are given see Paper so maybe the beta could be specified other than default? TODO
+        sigma_long: 0.12, //units in S/m but then they are scale to mS/um
+        sigma_long_2_trans_ratio : 0.25,
         cell__F : 96485.0,
         CaMK__KmCaMK : 0.065,
         CICR__SOICR : 10.0,

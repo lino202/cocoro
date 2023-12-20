@@ -73,6 +73,8 @@ def getDataFromMesh(meshPath):
         params[:,1] = mesh.point_data["stim_nodes_mag"]  #stim_mag
     if "stim_nodes_dur" in mesh.point_data.keys():
         params[:,2] = mesh.point_data["stim_nodes_dur"]    #stim_dur
+    if "stim_nodes_start" in mesh.point_data.keys():
+        params[:,3] = mesh.point_data["stim_nodes_start"]    #stim_start
     
     if "triangle" in mesh.cells_dict.keys():
         regQuadFDrelations = getregQuadFDrelations(vertexs)  # Get finite difference relations for simulating
@@ -95,7 +97,7 @@ def createUniqueName(name):
     return uniqueName
 
 # Main view.
-# Here we upload the mesh and parese its information
+# Here we upload the mesh and parse its information
 def tissue(request):
     context = {}
     if request.method == 'POST':
@@ -117,9 +119,52 @@ def tissue(request):
 
     return render(request, 'carSimMain/tissue.html', context)
 
-
 # Cellular view.
 # Here we can run cellular simulations and plots
 def cellular(request):
     # context = {}
     return render(request, 'carSimMain/cellular.html')
+
+
+def meshRender(request):
+    context = {}
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        context ['form'] = form
+        if form.is_valid():
+            uploadedFile = request.FILES['file']
+            fs = FileSystemStorage()
+            uniqueName = createUniqueName(uploadedFile.name)
+            fs.save(uniqueName, uploadedFile)
+            context['url'] = fs.url(uniqueName)
+            vertexs, cells, normals, meshType, voiInitValues, params = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
+            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 'voiInitValues': voiInitValues, 'params': params}
+            context ['data'] = data
+    else:
+        form = UploadFileForm()
+        context ['form'] = form
+
+
+    return render(request, 'carSimMain/render.html', context)
+
+
+def heat(request):
+    context = {}
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        context ['form'] = form
+        if form.is_valid():
+            uploadedFile = request.FILES['file']
+            fs = FileSystemStorage()
+            uniqueName = createUniqueName(uploadedFile.name)
+            fs.save(uniqueName, uploadedFile)
+            context['url'] = fs.url(uniqueName)
+            vertexs, cells, normals, meshType, voiInitValues, params = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
+            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 'voiInitValues': voiInitValues, 'params': params}
+            context ['data'] = data
+    else:
+        form = UploadFileForm()
+        context ['form'] = form
+
+
+    return render(request, 'carSimMain/heat.html', context)

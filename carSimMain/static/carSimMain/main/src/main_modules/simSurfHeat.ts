@@ -1,13 +1,11 @@
 import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from '../helpers/helper';
 import { createGPUBufferUint } from '../helpers/helper';
-import renderShaders from '../wgsl/commonVertFragShaders.wgsl';
-import computeShaders from '../wgsl/simSurfHeatShader.wgsl';
+import { commonVertFragShaders} from '../tissue_shaders/commonVertFragShaders.js';
+import { simSurfHeatComputeShader } from '../miscellaneous_shaders/simSurfHeatShader';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui'
 const createCamera =require('3d-view-controls')
 
-// This simulates line without Light as it is not neccessary
-// Voi refers to Variable of interest
 export const SimSurfHeat = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, voiInitValues:Float32Array, params:Float32Array) => {
     console.log("RENDERING AND SIMULATING 2D Surface");
     const gpu = await initGPU();
@@ -48,7 +46,7 @@ export const SimSurfHeat = async (vertexs:Float32Array, normals:Float32Array, in
         layout: 'auto',
         vertex: {
             module: device.createShaderModule({                    
-                code: renderShaders
+                code: commonVertFragShaders
             }),
             entryPoint: "vs_main",
             buffers:[
@@ -89,7 +87,7 @@ export const SimSurfHeat = async (vertexs:Float32Array, normals:Float32Array, in
         },
         fragment: {
             module: device.createShaderModule({                    
-                code: renderShaders
+                code: commonVertFragShaders
             }),
             entryPoint: "fs_main",
             targets: [
@@ -195,7 +193,7 @@ export const SimSurfHeat = async (vertexs:Float32Array, normals:Float32Array, in
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaders,
+            code: simSurfHeatComputeShader,
           }),
           entryPoint: 'comp_heat_main',
         },

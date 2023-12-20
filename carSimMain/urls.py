@@ -5,5 +5,7 @@ app_name = 'carSimMain'
 urlpatterns = [
     path('tissue/', views.tissue, name='tissue'),
     path('cellular/', views.cellular, name='cellular'),
+    path('heat/', views.heat, name='heat'),
+    path('render/', views.meshRender, name='render'),
     
 ]

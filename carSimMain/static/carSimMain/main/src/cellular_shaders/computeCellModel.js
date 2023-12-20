@@ -8,10 +8,10 @@ export function computeCellModel(cellModel) {
     var specificComputeCore;
     if (cellModel == 'Fenton_Karma'){
         specificDefinitions = fentonKarmaDefinitions;
-        specificComputeCore = fentonKarmaCoreCompute;
+        specificComputeCore = fentonKarmaCoreCompute('Cellular');
     }else if (cellModel == 'Gaur'){
         specificDefinitions = gaurDefinitions;
-        specificComputeCore = gaurCoreCompute;
+        specificComputeCore = gaurCoreCompute('Cellular');
     }else{
         throw new Error(`Unknown Cell Model "${cellModel}"`)
     }
@@ -39,7 +39,8 @@ export function computeCellModel(cellModel) {
             // But for the last voi in the right tip of the line we compute the Vm
             current_compute_interval = trunc(states.t/visual_params.plot_dt);
 
-            loop {
+            // Compute to complete the plotting resolution dt_plot
+            loop { 
             
                 // Get the stimulation
                 var i_stim:f32 = 0.0;
@@ -48,18 +49,20 @@ export function computeCellModel(cellModel) {
 
                 ${specificComputeCore}
 
-                states.vm = states.vm - ((curr_Iion + i_stim)* integ.dt / constants.cm);
-                vois[idx] = states.vm;
+                states.vm = states.vm - ((curr_Iion + i_stim)* integ.dt / constants.cm); // i_stim is negative and uA/cm2, so Iion should be in uA/cm2
 
                 states.t += integ.dt;
 
-                if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
-                    vois[idx] = ((vois[idx] - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min)) * 2 - 1;
-                }else{
-                    vois[idx] = 1.0; //Plot a line in the top if this overflows
-                }
-
                 if ( trunc(states.t/visual_params.plot_dt) != current_compute_interval) {break;}
+            }
+
+            // Pass to vois and normalize to plot
+            vois[idx] = states.vm;
+
+            if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
+                vois[idx] = ((vois[idx] - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min)) * 2 - 1;
+            }else{
+                vois[idx] = 1.0; //Plot a line in the top if this overflows
             }
             // results[idx] = vois[idx];
         }

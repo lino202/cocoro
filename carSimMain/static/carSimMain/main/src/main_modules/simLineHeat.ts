@@ -1,54 +1,89 @@
 import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from '../helpers/helper';
-import { createGPUBufferUint } from '../helpers/helper';
-import renderShaders from '../wgsl/commonVertFragShaders.wgsl';
-import computeShaders from '../wgsl/simLineHeatShader.wgsl';
+import { createGPUBufferUint, repeatFloat32Array } from '../helpers/helper';
+import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
+import { simLineHeatComputeShader } from '../miscellaneous_shaders/simLineHeatShader.js';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui'
 const createCamera =require('3d-view-controls')
 
-// This simulates line without Light as it is not neccessary
-// Voi refers to Variable of interest
+
 export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, indexs:Uint32Array, voiInitValues:Float32Array, stimParams:Float32Array) => {
     console.log("RENDERING AND SIMULATING LINE");
     const gpu = await initGPU();
     const device = gpu.device;
 
     //General simulation and visualization params
-    const simParams = {
-        simulate : true,
-        dt       : 0.01,
-        dx       : 0.1,
+    const constants = {
         k        : 0.05,   //Diff termica [cm2/s]
     };
 
+    const states = {
+        t : 0
+    };
+
+    const integ = {
+        simulate : true,
+        dt       : 0.01,
+        dx       : 0.1,
+    };
+
     const visualParams = {
-        voiMin   : 0.,
         voiMax   : 100.,
+        voiMin   : 0.,
+        plot_dt  : 1.,
     }
 
     //Dat.gui definition
     const gui             = new GUI();
-    const visualGUIFolder = gui.addFolder('Visualization')
-    const simGUIFolder    = gui.addFolder('Simulation')
-    Object.keys(visualParams).forEach((k) => {visualGUIFolder.add(visualParams, k);});
-    Object.keys(simParams).forEach((k) => {simGUIFolder.add(simParams, k);});
+    const visualsFolder = gui.addFolder('Visualization')
+    const ConstantsFolder    = gui.addFolder('Constants')
+    const integFolder = gui.addFolder('Integration');
+    
+    Object.keys(integ).forEach((k) => {integFolder.add(integ, k);});
+    Object.keys(visualParams).forEach((k) => {visualsFolder.add(visualParams, k);});
+    Object.keys(constants).forEach((k) => {ConstantsFolder.add(constants, k);});
 
     // create buffers
     const numberOfIndexes  = indexs.length;
     const numberOfVertices = voiInitValues.length;
     const stimParamsNum    = Math.trunc(stimParams.length / numberOfVertices);
+    
+    
+    const statesArray       = repeatFloat32Array(new Float32Array(Object.values(states)), numberOfVertices)
+    const constantsArray    = new Float32Array(Object.values(constants));
+    const integrationArray  = new Float32Array([integ.dt, integ.dx]);
+    const visualParamsArray = new Float32Array([visualParams.voiMax, visualParams.voiMin, visualParams.plot_dt]);
+
+    const statesBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const constantsBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const integBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * integrationArray.length,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    const visualParamsBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    
     const vertexBuffer     = createGPUBuffer(device, vertexs);
     const normalBuffer     = createGPUBuffer(device, normals);
     const indexBuffer      = createGPUBufferUint(device, indexs);
     const voiBuffer        = createGPUBuffer(device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
-    const stimParamsBuffer = createGPUBuffer(device, stimParams, GPUBufferUsage.STORAGE); //Check this Storage TODO
+    const stimBuffer = createGPUBuffer(device, stimParams, GPUBufferUsage.STORAGE); //Check this Storage TODO
 
     // RENDER PIPELINE ---------------------------------------------------
     const renderPipeline = device.createRenderPipeline({
         layout: 'auto',
         vertex: {
             module: device.createShaderModule({                    
-                code: renderShaders
+                code: commonVertFragShaders
             }),
             entryPoint: "vs_main",
             buffers:[
@@ -89,7 +124,7 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
         },
         fragment: {
             module: device.createShaderModule({                    
-                code: renderShaders
+                code: commonVertFragShaders
             }),
             entryPoint: "fs_main",
             targets: [
@@ -126,11 +161,6 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
 
-    const visualParamsBuffer = device.createBuffer({
-        size: Float32Array.BYTES_PER_ELEMENT * 2,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-    });
-
     const renderBindGroup = device.createBindGroup({
         layout: renderPipeline.getBindGroupLayout(0),
         entries: [
@@ -141,15 +171,7 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
                     offset: 0,
                     size: 192
                 }
-            },
-            {
-                binding: 1,
-                resource: {
-                    buffer: visualParamsBuffer,
-                    offset: 0,
-                    size: Float32Array.BYTES_PER_ELEMENT * 2
-                }
-            }           
+            }        
         ]
     });
 
@@ -176,26 +198,22 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
     };
 
     // COMPUTE PIPELINE ---------------------------------------------------
+    
+    //SimParams is an uniform as it contains
+    //"uniform" data to the overall simulation
 
-    // Result Matrix
-    // const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * 64;
+    // // Result Matrix
+    // const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * numberOfVertices;
     // const resultMatrixBuffer = device.createBuffer({
     //     size: resultMatrixBufferSize,
     //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     // });
-    
-    //SimParams is an uniform as it contains
-    //"uniform" data to the overall simulation
-    const simParamsBuffer = device.createBuffer({
-        size: Float32Array.BYTES_PER_ELEMENT * 2, // only need dt and lambda
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
 
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaders,
+            code: simLineHeatComputeShader,
           }),
           entryPoint: 'comp_heat_main',
         },
@@ -215,7 +233,7 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
                 {
                     binding: 1,
                     resource: {
-                        buffer: stimParamsBuffer,
+                        buffer: stimBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices * stimParamsNum,
                     },
@@ -223,12 +241,37 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
                 {
                     binding: 2,
                     resource: {
-                        buffer: simParamsBuffer,
+                        buffer: statesBuffer,
                         offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
                     },
-                }
+                },
+                {
+                    binding: 3,
+                    resource: {
+                        buffer: constantsBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
+                    },
+                },
+                {
+                    binding: 4,
+                    resource: {
+                        buffer: integBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * integrationArray.length,
+                    },
+                },
+                {
+                    binding: 5,
+                    resource: {
+                        buffer: visualParamsBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+                    },
+                },
                 // {
-                //     binding: 2,
+                //     binding: 6,
                 //     resource: {
                 //         buffer: resultMatrixBuffer,
                 //         offset: 0,
@@ -237,27 +280,41 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
             ],
     });
 
-    
+    // States is the only one written one time in heat
+    device.queue.writeBuffer(
+        statesBuffer,
+        0,
+        statesArray
+    );
+
     //Draw function for updating data on canvas and triggering gpu updates
     function draw() {
         
-        //Update Simulations Params
+        //Update Params
         device.queue.writeBuffer(
-            simParamsBuffer,
+            constantsBuffer,
             0,
-            new Float32Array([
-              simParams.simulate ? simParams.dt : 0.0,   
-              simParams.k * simParams.dt / (simParams.dx*simParams.dx)
+            new Float32Array([ 
+              constants.k * integ.dt / (integ.dx*integ.dx) //lambda
             ])
         );
 
-        //Update Visualization Params
         device.queue.writeBuffer(
             visualParamsBuffer,
             0,
             new Float32Array([
               visualParams.voiMax,   
-              visualParams.voiMin
+              visualParams.voiMin,
+              visualParams.plot_dt
+            ])
+        );
+
+        device.queue.writeBuffer(
+            integBuffer,
+            0,
+            new Float32Array([
+              integ.simulate ? integ.dt : 0.0,
+              integ.dx  
             ])
         );
 
@@ -325,6 +382,8 @@ export const SimLineHeat = async (vertexs:Float32Array, normals:Float32Array, in
         // await gpuReadBuffer.mapAsync(GPUMapMode.READ);
         // const arrayBuffer = gpuReadBuffer.getMappedRange();
         // console.log(new Float32Array(arrayBuffer));
+
+        // requestAnimationFrame(draw);
 
     }
 

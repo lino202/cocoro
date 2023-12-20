@@ -1,7 +1,7 @@
 import { initGPU, createGPUBuffer, createTransforms, createViewProjection} from '../helpers/helper';
 import {createAnimation, createGPUBufferUint } from '../helpers/helper';
 import { LightInputsInterface } from '../helpers/mysettings';
-import Shaders from '../wgsl/shaders.wgsl';
+import {commonVertFragShaders} from '../miscellaneous_shaders/renderVertFragShaders';
 import { mat4, vec3 } from 'gl-matrix';
 
 const createCamera =require('3d-view-controls')
@@ -33,7 +33,7 @@ export const CreateSurf = async (vertexs:Float32Array, normals:Float32Array, ind
         layout: 'auto',
         vertex: {
             module: device.createShaderModule({                    
-                code: Shaders
+                code: commonVertFragShaders
             }),
             entryPoint: "vs_main",
             buffers:[
@@ -71,7 +71,7 @@ export const CreateSurf = async (vertexs:Float32Array, normals:Float32Array, ind
         },
         fragment: {
             module: device.createShaderModule({                    
-                code: Shaders
+                code: commonVertFragShaders
             }),
             entryPoint: "fs_main",
             targets: [

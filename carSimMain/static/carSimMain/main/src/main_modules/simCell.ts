@@ -1,7 +1,7 @@
 import { initGPU, createGPUBuffer, createGPUBufferUint} from '../helpers/helper';
-import { renderVertexFragmentShaders } from '../cellModels/plot2DShaders.js';
+import { renderVertexFragmentShaders } from '../cellular_shaders/plot2DShaders';
 import { initCanvas, setY, setX } from '../helpers/axis';
-import { computeCellModel } from '../cellModels/computeCellModel.js'
+import { computeCellModel } from '../cellular_shaders/computeCellModel.js'
 import { GUI } from 'dat.gui';
 
 
@@ -300,6 +300,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
               integ.simulate ? integ.dt : 0.0,   
             ])
         );
+        
 
 
         //Generate the command encoder for both pipelines (Render and Compute)

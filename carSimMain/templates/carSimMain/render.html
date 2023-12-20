@@ -5,28 +5,15 @@
 <head>
    <meta charset="utf-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-   <title>WebGPU Tissue</title>
+   <title>WebGPU Render</title>
    <meta name="description" content="">
    <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 
 <body>
-   <h1>CarSim: WebGPU application for cardiac TISSUE simulation</h1><br>
+   <h1>CarSim: WebGPU application for Mesh rendering</h1><br>
 
-   <h2 id="id-gpu-check"></h2><br><br>
-
-   <form>
-      <label for="pseudo-bidomain">Pseudo-bidomain</label>
-      <input type="radio" id="pseudo" name="options">
-  
-      <label for="bidomain">Bidomain</label>
-      <input type="radio" id="bidomain" name="options">
-  
-      <label for="monodomain">Monodomain</label>
-      <input type="radio" id="monodomain" name="options">
-   </form>  
-  
-
+   <h2 id="id-gpu-check"></h2><br><br>  
 
    <div>
       <form enctype="multipart/form-data" method="post">
@@ -40,7 +27,7 @@
      {% endif %}
 
      <br>
-     <button type='button' id='btn-simulate'>LET'S GO!</button>
+     <button type='button' id='btn-render'>LET'S GO!</button>
      <br>
    </div>
 
@@ -61,7 +48,7 @@
    </script>
 
 
-   <script src="{% static 'carSimMain/main/dist/main_tissue.bundle.js' %}"></script>
+   <script src="{% static 'carSimMain/main/dist/main_render.bundle.js' %}"></script>
 
 
 
