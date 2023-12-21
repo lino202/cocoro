@@ -4,7 +4,9 @@ import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
 import { computeShaderMonodomainLine } from '../tissue_shaders/simLineMonodomainShader.js';
 import { mat4, vec3 } from 'gl-matrix';
-import { GUI } from 'dat.gui'
+import { GUI } from 'dat.gui';
+import Stats from "stats.js";
+
 const createCamera =require('3d-view-controls')
 
 
@@ -16,6 +18,11 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     console.log("RENDERING AND SIMULATING LINE");
     console.log("SIMULATING CELL MODEL:");
     console.log(cellObj.cellModel)
+    
+    var stats = new Stats();
+    stats.dom.style.cssText = 'position:fixed;bottom:0;right:0;cursor:pointer;opacity:0.9;z-index:10000';
+    document.body.appendChild( stats.dom );
+
     const gpu = await initGPU();
     const device = gpu.device;
     
@@ -23,9 +30,19 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         simulate: true,
         dt : 0.1,     //[ms]
         dx : 100,     //Mesh edglength [um] 
+        simulation_time : 0,
     }
     const integFolder = gui.addFolder('Integration');
-    Object.keys(integ).forEach((k) => {integFolder.add(integ, k);});
+    Object.keys(integ).forEach((k) => {
+        if (k=="simulation_time"){
+            integFolder.add(integ, k).listen();
+        }else{
+            integFolder.add(integ, k);
+        }
+        
+    });
+
+    var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
 
     // create buffers
     const numberOfIndexes  = meshData.indexs.length;
@@ -291,14 +308,18 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     //Draw function for updating data on canvas and triggering gpu updates
     function draw() {
+
+        stats.begin();
         
         //Update Params
+        if (integ.simulate){integ.simulation_time += plot_dt;}
 
         device.queue.writeBuffer(
             constantsBuffer,
             0,
             new Float32Array(Object.values(cellObj.constants))
         );
+        
         device.queue.writeBuffer(
             integBuffer,
             0,
@@ -347,6 +368,9 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             passEncoder.end();
         }
         device.queue.submit([commandEncoder.finish()]);
+
+        stats.end();
+
         requestAnimationFrame(draw)
 
         // // RESULTS Get a GPU buffer for reading in an unmapped state.

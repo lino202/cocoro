@@ -11,7 +11,9 @@
     ],
     "types": [
       "node",
-      "@webgpu/types"
+      "@webgpu/types",
+      "@types/stats"
+
     ],
     "module": "commonjs",
     "esModuleInterop": true,
