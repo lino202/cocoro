@@ -105,11 +105,9 @@ export function computeShaderMonodomainLine(cellModel) {
             }
 
             //TODO Is strange but for the FentonKarma model we get extra negative (under MDP) Vm in the extremes
-            // Put the Vm graph of one node and do 2D and 3D
 
-            //Pass to vois and normalize to plot    
-            //Normalize for visualization
-            // Of vm is out of the Voi max min range we would have a magenta color
+            //Pass to vois and normalize for plotting    
+            // If vm is out of the Voi max min range we would have a magenta color
             vois[idx] = (states[idx].vm - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min);                  
             // results[idx] = states[idx].vm;
             

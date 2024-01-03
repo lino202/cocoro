@@ -15,7 +15,7 @@ export const cellModelParamsGaur = {
         CaMK__CaMKt : 8.23910999999999914e-03,
         ionic_concentrations__ki : 140.76,
         ionic_concentrations__nai : 6.43,
-        cell__v : -87.3,
+        vm : -87.3,                          // The cellular Vm is changed to vm from cell_v for compliance
         ICaL__d : 4.42e-07,
         ICaL__fca : 0.988,
         ICaL__ff : 0.0,
@@ -38,7 +38,7 @@ export const cellModelParamsGaur = {
         cm : 1,           //units uF/cm2
         beta: 0.14,       //units 1/um as we follow openCARP, in this model Ageo and Vcell are given see Paper so maybe the beta could be specified other than default? TODO
         sigma_long: 0.12, //units in S/m but then they are scale to mS/um
-        sigma_long_2_trans_ratio : 0.25,
+        sigma_trans_2_long : 0.25,
         cell__F : 96485.0,
         CaMK__KmCaMK : 0.065,
         CICR__SOICR : 10.0,

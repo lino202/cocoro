@@ -44,9 +44,9 @@ $('#btn-simulate').on('click',()=>{
 
     if (meshData.meshType == "triangle"){
         console.log("Surface Heat Simulation")
-        SimSurfHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+        SimSurfHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.stim_params)
     }else if (meshData.meshType == "line") {
         console.log("Line Heat Simulation")
-        SimLineHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.params)
+        SimLineHeat(meshData.vertexs, meshData.normals, meshData.indexs, meshData.voiInitValues, meshData.stim_params)
     }
 });

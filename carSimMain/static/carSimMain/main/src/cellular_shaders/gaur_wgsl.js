@@ -39,7 +39,7 @@ export const gaurDefinitions = /*wgsl*/`
         cm : f32,
         beta : f32,
         sigma_long : f32,
-        sigma_long_2_trans_ratio : f32,
+        sigma_trans_2_long : f32,
         cell__F : f32,
         CaMK__KmCaMK : f32,
         CICR__SOICR : f32,

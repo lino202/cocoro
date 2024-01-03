@@ -12,7 +12,7 @@ export const fentonKarmaDefinitions = /*wgsl*/`
         cm           : f32,
         beta         : f32,
         sigma_long   : f32,
-        sigma_long_2_trans_ratio : f32,
+        sigma_trans_2_long : f32,
         V_0          : f32,
         V_fi         : f32,
         u_c          : f32,

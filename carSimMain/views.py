@@ -10,24 +10,40 @@ import datetime
 import copy
 from scipy.spatial import KDTree
 
-# TODO This might not been done here as it could be to slow
-def getregQuadFDrelations(points):
+def get2DMeshConnections(points):
     thres = np.unique(np.abs(np.diff(points,axis=0)))[1]
-    thres = thres + np.abs(np.sqrt(2*thres**2) - thres)/2
+    thres = thres * 2 -  thres * 0.5
     print("Threshold used for the search in getregQuadFDrelations {}".format(thres))
-    tree = KDTree(points)
-    res = tree.query_ball_point(points, thres - 1e-6)
-    resArr = np.zeros((res.shape[0],4))
-    for i in range(len(res)):
-        res[i].remove(i)
-        if len(res[i]) > 4: raise ValueError("Wrong threshold, more than 4 neighs where found, point {}".format(i))
-        if len(res[i])!=4:
-            resArr[i] = [-1, -1, -1, -1]
-        else:
-            resArr[i] = res[i]
-    return resArr
-    # rbmVersors = rbmVersors[idxs,:]
-    # angles = angles[idxs]
+
+    #Now we can get the node connections, ordeing like this nPointsx8 [index,:] = [i,j+1 ; i+1,j+1 ; i+1,j ; i+1,j-1 ; i,j-1 ; i-1,j-1 ; i-1,j ; i-1,j+1]
+    tree = KDTree(points)    
+    idx_neighbours = tree.query_ball_point(points, thres)
+ 
+    nodeConnections = np.ones((points.shape[0],8), dtype=int) * points.shape[0] #if I use nan or -1 we'll have to switch to float or i32 -> more memory, like this we use u32
+    for idx, point_idx in enumerate(idx_neighbours):
+        point_idx.remove(idx)
+        currentDiff = points[point_idx] - points[idx]
+        for sub_idx in range(currentDiff.shape[0]):
+            if (currentDiff[sub_idx,0] == 0. and currentDiff[sub_idx,1] > 0.):
+                nodeConnections[idx,0] = point_idx[sub_idx] 
+            elif (currentDiff[sub_idx,0] > 0. and currentDiff[sub_idx,1] > 0.):
+                nodeConnections[idx,1] = point_idx[sub_idx]
+            elif (currentDiff[sub_idx,0] > 0. and currentDiff[sub_idx,1] == 0.):
+                nodeConnections[idx,2] = point_idx[sub_idx]
+            elif (currentDiff[sub_idx,0] > 0. and currentDiff[sub_idx,1] < 0.):
+                nodeConnections[idx,3] = point_idx[sub_idx] 
+            elif (currentDiff[sub_idx,0] == 0. and currentDiff[sub_idx,1] < 0.):
+                nodeConnections[idx,4] = point_idx[sub_idx]
+            elif (currentDiff[sub_idx,0] < 0. and currentDiff[sub_idx,1] < 0.):
+                nodeConnections[idx,5] = point_idx[sub_idx]
+            elif (currentDiff[sub_idx,0] < 0. and currentDiff[sub_idx,1] == 0.):
+                nodeConnections[idx,6] = point_idx[sub_idx]
+            elif (currentDiff[sub_idx,0] < 0. and currentDiff[sub_idx,1] > 0.):
+                nodeConnections[idx,7] = point_idx[sub_idx]
+            else:
+                raise ValueError("Wrong assigment, please check")
+    
+    return nodeConnections
 
 
 def getDataFromMesh(meshPath):
@@ -54,9 +70,18 @@ def getDataFromMesh(meshPath):
         raise ValueError("Only triangles or lines are accepted")
     
     #Get normals
-    normals = np.zeros((mesh.points.shape[0],3))
     if 'vn' in mesh.point_data.keys():
         normals = mesh.point_data['vn']
+    elif 'obj:vn' in  mesh.point_data.keys():
+        normals = mesh.point_data['obj:vn']
+    else:
+        normals = np.zeros((mesh.points.shape[0],3))
+
+    if np.max(normals) > 0:
+        # ALWAYS normalize!
+        normals_norms = np.linalg.norm(normals, axis=1)
+        normals = normals /  np.array([normals_norms, normals_norms, normals_norms]).T
+
 
 
     #Get init Values for Voi
@@ -66,19 +91,31 @@ def getDataFromMesh(meshPath):
         voiInitValues = np.zeros(mesh.points.shape[0])
     
     #Get stim params from .vtk point data 
-    params = np.zeros((mesh.points.shape[0], 4)) 
+    stim_params = np.zeros((mesh.points.shape[0], 4)) 
     if "stim_nodes" in mesh.point_data.keys():
-        params[:,0] = mesh.point_data["stim_nodes"]    #stim_period
+        stim_params[:,0] = mesh.point_data["stim_nodes"]    #stim_period
     if "stim_nodes_mag" in mesh.point_data.keys():
-        params[:,1] = mesh.point_data["stim_nodes_mag"]  #stim_mag
+        stim_params[:,1] = mesh.point_data["stim_nodes_mag"]  #stim_mag
     if "stim_nodes_dur" in mesh.point_data.keys():
-        params[:,2] = mesh.point_data["stim_nodes_dur"]    #stim_dur
+        stim_params[:,2] = mesh.point_data["stim_nodes_dur"]    #stim_dur
     if "stim_nodes_start" in mesh.point_data.keys():
-        params[:,3] = mesh.point_data["stim_nodes_start"]    #stim_start
+        stim_params[:,3] = mesh.point_data["stim_nodes_start"]    #stim_start
     
+    # Get relations/connections for finite differences computation
     if "triangle" in mesh.cells_dict.keys():
-        regQuadFDrelations = getregQuadFDrelations(vertexs)  # Get finite difference relations for simulating
-        params = np.concatenate((params, regQuadFDrelations), axis=1)
+        connections = get2DMeshConnections(mesh.points)  # Get finite difference relations for simulating
+    else: 
+        connections = np.array([0,0,0,0])
+
+    # Get fiber direction 
+    if "fibers_long" in mesh.point_data.keys():
+        fibers_long = mesh.point_data['fibers_long'] 
+        # ALWAYS normalize!
+        fibers_norms = np.linalg.norm(fibers_long, axis=1)
+        fibers_long = fibers_long /  np.array([fibers_norms, fibers_norms, fibers_norms]).T
+    else:
+        fibers_long = np.zeros((mesh.points.shape[0],3))
+        fibers_long[:,0] = 1.
 
 
     #Get all as one dimensional list for passing to json and js
@@ -86,9 +123,11 @@ def getDataFromMesh(meshPath):
     cells          = cells.flatten().tolist()
     normals        = normals.flatten().tolist()
     voiInitValues  = voiInitValues.flatten().tolist()
-    params         = params.flatten().tolist()
+    stim_params    = stim_params.flatten().tolist()
+    connections    = connections.flatten().tolist()
+    fibers_long    = fibers_long.flatten().tolist()
 
-    return vertexs, cells, normals, meshType, voiInitValues, params
+    return vertexs, cells, normals, meshType, voiInitValues, stim_params, connections, fibers_long
     
 def createUniqueName(name):
     today = datetime.datetime.now()
@@ -109,8 +148,10 @@ def tissue(request):
             uniqueName = createUniqueName(uploadedFile.name)
             fs.save(uniqueName, uploadedFile)
             context['url'] = fs.url(uniqueName)
-            vertexs, cells, normals, meshType, voiInitValues, params = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
-            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 'voiInitValues': voiInitValues, 'params': params}
+            vertexs, cells, normals, meshType, voiInitValues, stim_params, connections, fibers_long = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
+            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 
+                    'voiInitValues': voiInitValues, 'stim_params': stim_params, 
+                    'connections': connections, 'fibers_long' : fibers_long}
             context ['data'] = data
     else:
         form = UploadFileForm()

@@ -2,7 +2,7 @@ import { createTransforms, createViewProjection, meshObj} from '../helpers/helpe
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
-import { computeShaderMonodomainLine } from '../tissue_shaders/simLineMonodomainShader.js';
+import { computeShaderMonodomainSurf } from '../tissue_shaders/simSurfMonodomainShader.js';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
@@ -12,10 +12,10 @@ const createCamera =require('3d-view-controls')
 
 // This simulates line without Light as it is not neccessary
 // Voi refers to Variable of interest
-export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj) => {
+export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj) => {
     
     
-    console.log("RENDERING AND SIMULATING LINE");
+    console.log("RENDERING AND SIMULATING SURFACE");
     console.log("SIMULATING CELL MODEL:");
     console.log(cellObj.cellModel)
     
@@ -28,7 +28,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     
     const integ = {
         simulate: true,
-        dt : 0.1,     //[ms]
+        dt : 0.01,     //[ms]
         dx : 100,     //Mesh edglength [um] 
         simulation_time : 0,
     }
@@ -38,30 +38,39 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             integFolder.add(integ, k).listen();
         }else{
             integFolder.add(integ, k);
-        }
-        
+        } 
     });
 
     var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
 
-    // create buffers
+    // create arrays and buffers
     const numberOfIndexes  = meshData.indexs.length;
     const numberOfVertices = Math.trunc(meshData.vertexs.length / 3);
     const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfVertices);
     const voiInitValues    = new Float32Array(numberOfVertices);
     voiInitValues.fill(cellObj.states.vm)
 
-    const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices)
-    const constantsArray    = new Float32Array(Object.values(cellObj.constants))
-    const integrationArray  = new Float32Array([integ.dt, integ.dx]) 
+    const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices);
+    const constantsArray    = new Float32Array(Object.values(cellObj.constants));
+    const integrationArray  = new Float32Array([integ.dt, integ.dx]);
     const visualParamsArray = new Float32Array([gui.__folders.Visualization.__controllers[0].getValue(), 
                                                 gui.__folders.Visualization.__controllers[1].getValue(), 
                                                 gui.__folders.Visualization.__controllers[2].getValue()]
     );
+    const fiberOrientationArray = new Float32Array(Object.values(meshData.fibers_long));
+    const connectionsArray      = new Uint32Array(Object.values(meshData.connections));
 
     const statesBuffer = device.createBuffer({
         size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const fiberOrientationBuffer = device.createBuffer({
+        size: Float32Array.BYTES_PER_ELEMENT * fiberOrientationArray.length,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+    const connectionsBuffer = device.createBuffer({
+        size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
     });
     const constantsBuffer = device.createBuffer({
         size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
@@ -77,6 +86,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     });
 
 
+    // TODO Read the tojiro post and determine which one of the two buffer creations (up or bottom) is better for us
 
     const vertexBuffer = createGPUBuffer(device, meshData.vertexs);
     const normalBuffer = createGPUBuffer(device, meshData.normals);
@@ -140,7 +150,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             ]
         },
         primitive:{
-            topology: "line-list",
+            topology: "triangle-list",
             // cullMode: 'back'
         },
         depthStencil:{
@@ -212,12 +222,12 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     // });
 
-    // console.log(computeShaderMonodomainLine(cellObj.cellModel))
+    console.log(computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices))
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainLine(cellObj.cellModel),
+            code: computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices),
           }),
           entryPoint: 'comp_monodomain_main',
         },
@@ -253,13 +263,29 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                 {
                     binding: 3,
                     resource: {
+                        buffer: fiberOrientationBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * fiberOrientationArray.length,
+                    },
+                },
+                {
+                    binding: 4,
+                    resource: {
+                        buffer: connectionsBuffer,
+                        offset: 0,
+                        size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
+                    },
+                },
+                {
+                    binding: 5,
+                    resource: {
                         buffer: constantsBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
                     },
                 },
                 {
-                    binding: 4,
+                    binding: 6,
                     resource: {
                         buffer: integBuffer,
                         offset: 0,
@@ -267,15 +293,16 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     },
                 },
                 {
-                    binding: 5,
+                    binding: 7,
                     resource: {
                         buffer: visualParamsBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
                     },
-                }
+                },
+
                 // {
-                //     binding: 6,
+                //     binding: 8,
                 //     resource: {
                 //         buffer: resultMatrixBuffer,
                 //         offset: 0,
@@ -301,6 +328,18 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         statesBuffer,
         0,
         statesArray
+    );
+
+    device.queue.writeBuffer(
+        fiberOrientationBuffer,
+        0,
+        fiberOrientationArray
+    );
+
+    device.queue.writeBuffer(
+        connectionsBuffer,
+        0,
+        connectionsArray
     );
 
     //Draw function for updating data on canvas and triggering gpu updates

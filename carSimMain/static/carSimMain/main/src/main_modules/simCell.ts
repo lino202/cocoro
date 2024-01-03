@@ -3,6 +3,7 @@ import { renderVertexFragmentShaders } from '../cellular_shaders/plot2DShaders';
 import { initCanvas, setY, setX } from '../helpers/axis';
 import { computeCellModel } from '../cellular_shaders/computeCellModel.js'
 import { GUI } from 'dat.gui';
+import Stats from "stats.js";
 
 
 function getIndexesForLine(numPoints: number): Uint32Array{
@@ -44,12 +45,24 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     console.log("RENDERING PLOT AND SIMULATING CELL MODEL:");
     console.log(cellModel)
 
+    var stats = new Stats();
+    stats.dom.style.cssText = 'position:fixed;bottom:0;right:0;cursor:pointer;opacity:0.9;z-index:10000';
+    document.body.appendChild( stats.dom );
+
     const integ = {
         simulate: true,
         dt : 0.1,
+        simulation_time : 0,
     }
     const integFolder = gui.addFolder('Integration');
-    Object.keys(integ).forEach((k) => {integFolder.add(integ, k);});
+    Object.keys(integ).forEach((k) => {
+        if (k=="simulation_time"){
+            integFolder.add(integ, k).listen();
+        }else{
+            integFolder.add(integ, k);
+        } 
+    });
+    var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
 
     const gpu = await initGPU();
     const device = gpu.device;
@@ -281,6 +294,11 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
 
     //Draw function for updating data on canvas and triggering gpu updates
     function draw() {
+
+        stats.begin();
+        
+        //Update Params
+        if (integ.simulate){integ.simulation_time += plot_dt;}
         
         //Update params (only constants and stim. States and visuals won't change for now)
         device.queue.writeBuffer(
@@ -328,6 +346,9 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
             passEncoder.end();
         }
         device.queue.submit([commandEncoder.finish()]);
+
+        stats.end();
+        
         requestAnimationFrame(draw);
 
         // RESULTS Get a GPU buffer for reading in an unmapped state.

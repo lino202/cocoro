@@ -8,7 +8,9 @@ export interface meshObj {
     normals: Float32Array,
     meshType: string,
     voiInitValues: Float32Array,
-    params: Float32Array
+    stim_params: Float32Array,
+    connections: Uint32Array,
+    fibers_long: Float32Array
 }
 
 export const getDataFromDjango = (data:any) =>{
@@ -16,7 +18,9 @@ export const getDataFromDjango = (data:any) =>{
     const indexs = new Uint32Array(data.cells)
     const normals = new Float32Array(data.normals);
     const voiInitValues = new Float32Array(data.voiInitValues);
-    const params = new Float32Array(data.params);
+    const stim_params = new Float32Array(data.stim_params);
+    const connections = new Uint32Array(data.connections);
+    const fibers_long = new Float32Array(data.fibers_long);
     const meshType = data.meshType;
     var meshData:meshObj = {
         vertexs: vertexs,
@@ -24,7 +28,9 @@ export const getDataFromDjango = (data:any) =>{
         normals: normals,
         meshType: meshType,
         voiInitValues: voiInitValues,
-        params: params
+        stim_params: stim_params,
+        connections: connections,
+        fibers_long: fibers_long,
     }
     return meshData;
 }
