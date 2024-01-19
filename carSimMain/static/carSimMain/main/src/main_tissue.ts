@@ -55,6 +55,8 @@ $(document).ready(function(){
 
 // TODO check that chrome is using on chip gpu and not the nvidia dedicated one
 
+// TODO it seems to work with 360k but 6M nodes is to slow to pass from python to ts, check what can be done!!
+
 
 $('#btn-simulate').on('click',()=>{
 
