@@ -137,8 +137,13 @@ export const initGPU = async () => {
     // const adapter = await navigator.gpu.requestAdapter() as GPUAdapter;
 
     const adapter = await navigator.gpu.requestAdapter({
-        powerPreference: 'high-performance'
+        powerPreference: 'high-performance',
+        forceFallbackAdapter: false
     }) as GPUAdapter;
+    console.log(adapter.isFallbackAdapter);
+    console.log(adapter.limits);
+    const adapterInfo = await adapter.requestAdapterInfo() as GPUAdapterInfo;
+    console.log(adapterInfo);
     const device = await adapter.requestDevice() as GPUDevice;
     const context = canvas.getContext('webgpu') as unknown as GPUCanvasContext;
     const devicePixelRatio = window.devicePixelRatio || 1;

@@ -428,10 +428,15 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         // const gpuCommands = commandEncoder.finish();
         // device.queue.submit([gpuCommands]);
 
+        // stats.end();
+
         // // Read buffer.
         // await gpuReadBuffer.mapAsync(GPUMapMode.READ);
         // const arrayBuffer = gpuReadBuffer.getMappedRange();
+        // // if ((integ.simulation_time > 80) && (integ.simulation_time < 120)) {
         // console.log(new Float32Array(arrayBuffer));
+        // // }   
+        
 
         // requestAnimationFrame(draw);
 

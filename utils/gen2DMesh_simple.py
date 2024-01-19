@@ -10,7 +10,6 @@ def main():
     parser.add_argument('--outPath',  type=str, required=True)
     args = parser.parse_args()
 
-    dataPath = "/home/maxi/Documents/Practice/NumericMethods/Meshes/data/"
     div = 10
     originTuple = (0,0)
     endTuple = (5,5)

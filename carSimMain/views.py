@@ -9,6 +9,7 @@ import numpy as np
 import datetime
 import copy
 from scipy.spatial import KDTree
+from tqdm import tqdm
 
 def get2DMeshConnections(points):
     thres = np.unique(np.abs(np.diff(points,axis=0)))[1]
@@ -20,7 +21,7 @@ def get2DMeshConnections(points):
     idx_neighbours = tree.query_ball_point(points, thres)
  
     nodeConnections = np.ones((points.shape[0],8), dtype=int) * points.shape[0] #if I use nan or -1 we'll have to switch to float or i32 -> more memory, like this we use u32
-    for idx, point_idx in enumerate(idx_neighbours):
+    for idx, point_idx in tqdm(enumerate(idx_neighbours)):
         point_idx.remove(idx)
         currentDiff = points[point_idx] - points[idx]
         for sub_idx in range(currentDiff.shape[0]):

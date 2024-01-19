@@ -55,13 +55,6 @@ export function computeShaderMonodomainSurf(cellModel, nNodes){
             iminus1_j1: u32
         };
 
-        // struct SecondDerivatives{
-        //     d2dxdx_V: f32,
-        //     d2dydy_V: f32,
-        //     d2dxdy_V: f32,
-        //     d2dydx_V: f32
-        // };
-
         ${specificDefinitions}
 
         @binding(0) @group(0) var<storage, read_write> vois          : array<f32>;
@@ -126,9 +119,14 @@ export function computeShaderMonodomainSurf(cellModel, nNodes){
 
                 ${secondDerivativesShader}
 
+                d2dydy_V = 0.0;    
+                d2dxdy_V = 0.0;
+
                 var ddx_A:f32 = d2dxdx_V * sigma_xx + d2dxdy_V * sigma_xy; 
                 var ddy_B:f32 = d2dxdy_V * sigma_yx + d2dydy_V * sigma_yy;
                 var divG_gradV:f32 = ddx_A + ddy_B;
+
+                storageBarrier();
 
                 // 10^5 to scale to have consistent units
                 states[idx].vm = states[idx].vm + ((divG_gradV * integ.dt/2 * 100000) / (constants.beta * constants.cm));
@@ -148,6 +146,7 @@ export function computeShaderMonodomainSurf(cellModel, nNodes){
                 // or tissue with unique cellType. So constants are unique for all nodes but the states should be repetead for all nodes -> array
                 states[idx].vm =  states[idx].vm - ((curr_Iion + i_stim) * integ.dt / constants.cm) ;
                 
+                storageBarrier();
 
                 // Monodomain Step 3, diffusion
                 d2dxdx_V = 0.0;
@@ -156,14 +155,25 @@ export function computeShaderMonodomainSurf(cellModel, nNodes){
 
                 ${secondDerivativesShader}
 
+                d2dydy_V = 0.0;    
+                d2dxdy_V = 0.0;
+
+                // results[idx] = d2dxdx_V;
+
                 ddx_A = d2dxdx_V * sigma_xx + d2dxdy_V * sigma_xy; 
                 ddy_B = d2dxdy_V * sigma_yx + d2dydy_V * sigma_yy;
                 divG_gradV = ddx_A + ddy_B;
 
+                storageBarrier();
+
                 // 10^5 to scale to have consistent units
                 states[idx].vm = states[idx].vm + ((divG_gradV * integ.dt/2 * 100000) / (constants.beta * constants.cm));
 
+                
                 states[idx].t += integ.dt;
+
+
+                storageBarrier();
 
                 if ( trunc(states[idx].t/visual_params.plot_dt) != current_compute_interval) {break;}
 
@@ -172,7 +182,7 @@ export function computeShaderMonodomainSurf(cellModel, nNodes){
             //Pass to vois and normalize for plotting    
             // If vm is out of the Voi max min range we would have a magenta color
             vois[idx] = (states[idx].vm - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min);                  
-            // results[idx] = states[idx].vm;
+
             
         }
     `;

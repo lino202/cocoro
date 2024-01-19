@@ -1,5 +1,4 @@
 
-
 export const gaurDefinitions = /*wgsl*/`
 
     struct States {
@@ -32,7 +31,8 @@ export const gaurDefinitions = /*wgsl*/`
         I_Na__j : f32,
         I_Na__m : f32,
         ionic_concentrations__cansr : f32,
-        t : f32
+        t : f32,
+        divG_gradV : f32,
     }
 
     struct Constants {
@@ -125,7 +125,7 @@ export const gaurDefinitions = /*wgsl*/`
         INaCa_i__Gncx : f32,
         ITo__Gto : f32,
     }
-`;
+`;  
 
 export function gaurCoreCompute(simScale){
 
@@ -174,6 +174,7 @@ export function gaurCoreCompute(simScale){
         
         // Actually compute the ionic model 
         // New subvariables are defined and currents have the prefix curr_
+        // The vm==0 if conditions are changed to abs(vm)<1e-5 as 1/exp(vm)-1 here overflows, in c++ expm1 is available which seems to do not have this problem?
         var CICR__diff_A:f32;
         if (${statesString}.CICR__tjsrol<5.0){
             CICR__diff_A = -${statesString}.CICR__A/0.1;
@@ -255,7 +256,7 @@ export function gaurCoreCompute(simScale){
         
         var CaMK__vfrt:f32 = ( ${statesString}.vm*constants.cell__F)/( constants.cell__R*constants.cell__T);
         var ICaL__PhiCaL:f32;
-        if (${statesString}.vm==0.0) {
+        if  (abs(${statesString}.vm)<1e-5) {
             ICaL__PhiCaL =  ( ( 2.00000*constants.cell__F)*( ${statesString}.ionic_concentrations__cass*exp( 2.00000*(( ${statesString}.vm*constants.cell__F)/( constants.cell__R*constants.cell__T))) -  0.341000*cell__cao))* 1.0 ;
         } else {
             ICaL__PhiCaL =  ( ( 2.00000*constants.cell__F)*( ${statesString}.ionic_concentrations__cass*exp( 2.00000*(( ${statesString}.vm*constants.cell__F)/( constants.cell__R*constants.cell__T))) -  0.341000*cell__cao))*( 2.00000*CaMK__vfrt)/(exp( 2.00000*CaMK__vfrt) - 1.00000);
@@ -307,7 +308,7 @@ export function gaurCoreCompute(simScale){
         var ionic_concentrations__diff_ki:f32 = (  - ((((curr_IKr+curr_IKs)+curr_IK1)+curr_IKb) -  2.00000*curr_INaK)*cell__Acap)/( ( 2.00000*constants.cell__F)*cell__vmyo)+( diffusion__JdiffK*cell__vss)/cell__vmyo;
 
         var ICaL__PhiCaK:f32;
-        if (${statesString}.vm==0.0) {
+        if  (abs(${statesString}.vm)<1e-5) {
             ICaL__PhiCaK = ( constants.cell__F*( ( 0.750000*${statesString}.ionic_concentrations__kss)*exp(CaMK__vfrt) -  0.750000*constants.cell__ko))*1.0;
         } else {
             ICaL__PhiCaK = ( constants.cell__F*( ( 0.750000*${statesString}.ionic_concentrations__kss)*exp(CaMK__vfrt) -  0.750000*constants.cell__ko))*CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000);
@@ -350,7 +351,7 @@ export function gaurCoreCompute(simScale){
         var CaMK__ENa:f32 =  (( constants.cell__R*constants.cell__T)/constants.cell__F)*log(constants.cell__nao/${statesString}.ionic_concentrations__nai);
         var curr_INaL:f32 =  ( ( ( ( constants.INaL__GNaL*${statesString}.INaL__ml)*${statesString}.INaL__ml)*${statesString}.INaL__ml)*${statesString}.INaL__hl)*(${statesString}.vm - CaMK__ENa);
         var curr_INab:f32;
-        if (${statesString}.vm==0.0) {
+        if  (abs(${statesString}.vm)<1e-5) {
             curr_INab = ( ( constants.INab__PNab*constants.cell__F)*( ${statesString}.ionic_concentrations__nai*exp(CaMK__vfrt) - constants.cell__nao))*1.0;
         } else {
             curr_INab = ( ( constants.INab__PNab*constants.cell__F)*( ${statesString}.ionic_concentrations__nai*exp(CaMK__vfrt) - constants.cell__nao))*CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000);
@@ -390,7 +391,7 @@ export function gaurCoreCompute(simScale){
         var INaCa_ss__allo1:f32 = 1.00000/(1.00000+ (constants.INaCa_i__KmCaAct/${statesString}.ionic_concentrations__cass)*(constants.INaCa_i__KmCaAct/${statesString}.ionic_concentrations__cass));
         var curr_INaCa_ss:f32 =  ( ( 0.200000*constants.INaCa_i__Gncx)*INaCa_ss__allo1)*( constants.INaCa_i__zna*INaCa_ss__JncxNa1+ constants.ICaL__zca*INaCa_ss__JncxCa1);
         var ICaL__PhiCaNa:f32;
-        if (${statesString}.vm==0.0) {
+        if  (abs(${statesString}.vm)<1e-5) {
             ICaL__PhiCaNa = ( constants.cell__F*( ( 0.750000*${statesString}.ionic_concentrations__nass)*exp(CaMK__vfrt) -  0.750000*constants.cell__nao))*1.0;
         } else {
             ICaL__PhiCaNa = ( constants.cell__F*( ( 0.750000*${statesString}.ionic_concentrations__nass)*exp(CaMK__vfrt) -  0.750000*constants.cell__nao))*CaMK__vfrt/(exp(CaMK__vfrt) - 1.00000);
@@ -399,7 +400,7 @@ export function gaurCoreCompute(simScale){
         var ionic_concentrations__diff_nass:f32 = (  - (curr_ICaNa+ 3.00000*curr_INaCa_ss)*cell__Acap)/( ( 2.00000*constants.cell__F)*cell__vss) - diffusion__JdiffNa;
 
         var curr_ICab:f32;
-        if (${statesString}.vm==0.0) {
+        if  (abs(${statesString}.vm)<1e-5) {
             curr_ICab = ( ( ( constants.ICab__PCab*2.00000)*constants.cell__F)*( ${statesString}.ionic_concentrations__cai*exp( 2.00000*CaMK__vfrt) -  0.341000*cell__cao))*1.0;
         } else {
             curr_ICab = ( ( ( constants.ICab__PCab*2.00000)*constants.cell__F)*( ${statesString}.ionic_concentrations__cai*exp( 2.00000*CaMK__vfrt) -  0.341000*cell__cao))*( 2.00000*CaMK__vfrt)/(exp( 2.00000*CaMK__vfrt) - 1.00000);

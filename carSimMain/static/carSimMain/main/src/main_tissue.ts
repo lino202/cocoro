@@ -1,5 +1,6 @@
 import { SimLineMonodomain} from './main_modules/simLineMonodomain';
 import { SimSurfMonodomain} from './main_modules/simSurfMonodomain';
+import { SimSurfMonodomainParts } from './main_modules/simSurfMonodomainParts';
 import { LightInputsInterface } from './helpers/mysettings';
 import { checkWebGPU, getDataFromDjango, meshObj } from './helpers/helper';
 import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/manageCellModelGUI';
@@ -62,7 +63,8 @@ $('#btn-simulate').on('click',()=>{
 
     if (meshData.meshType == "triangle"){
         console.log("Surface Monodomain Simulation")
-        SimSurfMonodomain(gui, meshData, cellObj)        
+        // SimSurfMonodomain(gui, meshData, cellObj) 
+        SimSurfMonodomainParts(gui, meshData, cellObj) ;
     }else if (meshData.meshType == "line") {
         console.log("Line Monodomain Simulation")
         SimLineMonodomain(gui, meshData, cellObj)
