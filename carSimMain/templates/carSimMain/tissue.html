@@ -1,4 +1,4 @@
-{% load static %}
+<!-- {% load static %} -->
 
 
 <!DOCTYPE html>
@@ -15,7 +15,7 @@
 
    <h2 id="id-gpu-check"></h2><br><br>
 
-   <form>
+   <!-- <form>
       <label for="pseudo-bidomain">Pseudo-bidomain</label>
       <input type="radio" id="pseudo" name="options">
   
@@ -24,41 +24,39 @@
   
       <label for="monodomain">Monodomain</label>
       <input type="radio" id="monodomain" name="options">
-   </form>  
+   </form>   -->
   
 
+   <h1>List of Meshes in the Database</h1>
+   <form id="selected_mesh" >
+
+      <label for="selectMeshOptions">Select a Mesh:</label>
+      <select id="selectMeshOptions">
+         {% for file in files %}
+            <option value="{{ file }}">{{ file }}</option>
+         {% endfor %}
+      </select>
+   </form>
 
    <div>
-      <form enctype="multipart/form-data" method="post">
-         {% csrf_token %}
-         {{ form }}  
-         <button type="submit"  id='btn-uploadMesh'> Upload Mesh</button>
-     </form>
- 
-     {%if url%}
-       <p> Uploaded File: <a href="{{ url }}">{{ url }}</a></p>
-     {% endif %}
-
      <br>
      <button type='button' id='btn-simulate'>LET'S GO!</button>
      <br>
    </div>
-
-   
    
    <div>
 
       <br>
       <canvas id="canvas-webgpu" width="720" height="640"></canvas>
       <br>
-      <button type='button' id='btn-print-mesh-info'>Print Mesh Info</button>
+      <!-- <button type='button' id='btn-print-mesh-info'>Print Mesh Info</button> -->
    
    </div>
 
-   {{ data|json_script:"data" }}
+   <!-- {{ path|json_script:"path" }}
    <script>
-      const djangodata = JSON.parse(document.getElementById('data').textContent);
-   </script>
+      const path = JSON.parse(document.getElementById('path').textContent);
+   </script> -->
 
 
    <script src="{% static 'carSimMain/main/dist/main_tissue.bundle.js' %}"></script>

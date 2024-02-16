@@ -4,36 +4,14 @@ import { AddColors } from "./colorMap";
 
 export interface meshObj {
     vertexs: Float32Array,
-    indexs:  Uint32Array,
+    render_elems:  Uint32Array,
     normals: Float32Array,
-    meshType: string,
-    voiInitValues: Float32Array,
+    elementType: string,
     stim_params: Float32Array,
     connections: Uint32Array,
     fibers_long: Float32Array
 }
 
-export const getDataFromDjango = (data:any) =>{
-    const vertexs = new Float32Array(data.vertexs)
-    const indexs = new Uint32Array(data.cells)
-    const normals = new Float32Array(data.normals);
-    const voiInitValues = new Float32Array(data.voiInitValues);
-    const stim_params = new Float32Array(data.stim_params);
-    const connections = new Uint32Array(data.connections);
-    const fibers_long = new Float32Array(data.fibers_long);
-    const meshType = data.meshType;
-    var meshData:meshObj = {
-        vertexs: vertexs,
-        indexs:  indexs,
-        normals: normals,
-        meshType: meshType,
-        voiInitValues: voiInitValues,
-        stim_params: stim_params,
-        connections: connections,
-        fibers_long: fibers_long,
-    }
-    return meshData;
-}
 
 export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0), isAnimation = true ) => {
     function step() {
@@ -134,17 +112,26 @@ export const initGPU = async () => {
     }
 
     const canvas = document.getElementById('canvas-webgpu') as HTMLCanvasElement;
-    // const adapter = await navigator.gpu.requestAdapter() as GPUAdapter;
 
     const adapter = await navigator.gpu.requestAdapter({
-        powerPreference: 'high-performance',
+        powerPreference: 'high-performance',              //Anyways you need to check chrome is using the most powerfull one or has accesibility to both on chip and discrete gpus 
         forceFallbackAdapter: false
     }) as GPUAdapter;
-    console.log(adapter.isFallbackAdapter);
-    console.log(adapter.limits);
+
+    const adapterLimits = adapter.limits
+    console.log(adapterLimits);
     const adapterInfo = await adapter.requestAdapterInfo() as GPUAdapterInfo;
     console.log(adapterInfo);
-    const device = await adapter.requestDevice() as GPUDevice;
+
+    // Request highest limit
+    const device = await adapter.requestDevice({
+        requiredLimits: { 
+            maxBufferSize: adapterLimits.maxBufferSize,
+            maxUniformBufferBindingSize: adapterLimits.maxUniformBufferBindingSize, 
+            maxStorageBufferBindingSize: adapterLimits.maxStorageBufferBindingSize
+        },
+    }) as GPUDevice;
+
     const context = canvas.getContext('webgpu') as unknown as GPUCanvasContext;
     const devicePixelRatio = window.devicePixelRatio || 1;
     // const size = [

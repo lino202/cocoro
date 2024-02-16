@@ -1,8 +1,7 @@
-from django.shortcuts import render
-from django.conf import settings
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.core.files.storage import FileSystemStorage
-from .forms import UploadFileForm
+from django.conf import settings
+from .forms import UploadMeshForm
 import meshio
 import os 
 import numpy as np
@@ -10,6 +9,29 @@ import datetime
 import copy
 from scipy.spatial import KDTree
 from tqdm import tqdm
+import pickle
+# from .models import File
+
+# USEFUL FUNCTIONS -----------------------------------------------------------------------------------------
+
+# def read_buffer(f):
+#     # The first line specifies the version
+#     line = f.readline().decode().strip()
+#     if not line.startswith("# vtk DataFile Version"):
+#         raise meshio._exceptions.ReadError("Illegal VTK header")
+
+#     version = line[23:]
+#     if version == "5.1":
+#         return meshio.vtk._vtk_51.read(f)
+
+#     # this also works for older format versions
+#     return meshio.vtk._vtk_42.read(f)
+
+def createUniqueName(name):
+    today = datetime.datetime.now()
+    date_time = today.strftime("%d-%m-%Y__%H-%M-%S")
+    uniqueName = name.split('.')[0] + '_' + date_time + '.' + name.split('.')[1]
+    return uniqueName
 
 def get2DMeshConnections(points):
     thres = np.unique(np.abs(np.diff(points,axis=0)))[1]
@@ -59,16 +81,13 @@ def getDataFromMesh(meshPath):
     
     #Get cells, obj files cannot have line elems so 1D should be pass as .vtk
     if "triangle" in mesh.cells_dict.keys():   
-        cells = mesh.cells_dict['triangle']
-        meshType = "triangle" 
-    elif "polygon" in mesh.cells_dict.keys():
-        cells = mesh.cells_dict['polygon']
-        meshType = "line"
+        cells       = mesh.cells_dict['triangle']
+        elementType = "triangle" 
     elif "line" in mesh.cells_dict.keys():
         cells = mesh.cells_dict['line']
-        meshType = "line"
+        elementType = "line"
     else: 
-        raise ValueError("Only triangles or lines are accepted")
+        raise ValueError("Only triangles or lines are accepted for now...")
     
     #Get normals
     if 'vn' in mesh.point_data.keys():
@@ -82,14 +101,6 @@ def getDataFromMesh(meshPath):
         # ALWAYS normalize!
         normals_norms = np.linalg.norm(normals, axis=1)
         normals = normals /  np.array([normals_norms, normals_norms, normals_norms]).T
-
-
-
-    #Get init Values for Voi
-    if 'voi_init' in mesh.point_data.keys():
-        voiInitValues = mesh.point_data['voi_init']
-    else:
-        voiInitValues = np.zeros(mesh.points.shape[0])
     
     #Get stim params from .vtk point data 
     stim_params = np.zeros((mesh.points.shape[0], 4)) 
@@ -123,90 +134,160 @@ def getDataFromMesh(meshPath):
     vertexs        = vertexs.flatten().tolist()
     cells          = cells.flatten().tolist()
     normals        = normals.flatten().tolist()
-    voiInitValues  = voiInitValues.flatten().tolist()
     stim_params    = stim_params.flatten().tolist()
     connections    = connections.flatten().tolist()
     fibers_long    = fibers_long.flatten().tolist()
 
-    return vertexs, cells, normals, meshType, voiInitValues, stim_params, connections, fibers_long
-    
-def createUniqueName(name):
-    today = datetime.datetime.now()
-    date_time = today.strftime("%d-%m-%Y__%H-%M-%S")
-    uniqueName = name.split('.')[0] + '_' + date_time + '.' + name.split('.')[1]
-    return uniqueName
+    return vertexs, cells, normals, elementType, stim_params, connections, fibers_long
+
+
+# ACTUAL VIEWS -----------------------------------------------------------------------------------------
 
 # Main view.
-# Here we upload the mesh and parse its information
+# Here we upload the mesh and parse its information and save in database
 def tissue(request):
-    context = {}
-    if request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
-        context ['form'] = form
-        if form.is_valid():
-            uploadedFile = request.FILES['file']
-            fs = FileSystemStorage()
-            uniqueName = createUniqueName(uploadedFile.name)
-            fs.save(uniqueName, uploadedFile)
-            context['url'] = fs.url(uniqueName)
-            vertexs, cells, normals, meshType, voiInitValues, stim_params, connections, fibers_long = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
-            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 
-                    'voiInitValues': voiInitValues, 'stim_params': stim_params, 
-                    'connections': connections, 'fibers_long' : fibers_long}
-            context ['data'] = data
-    else:
-        form = UploadFileForm()
-        context ['form'] = form
-
-
-    return render(request, 'carSimMain/tissue.html', context)
+    # Retrieve data from the database
+    files = os.listdir(settings.MEDIA_ROOT)
+    files = [file.split('.')[0] for file in files if ".pickle" in file]
+    return render(request, 'carSimMain/tissue.html', {'files': files})
 
 # Cellular view.
 # Here we can run cellular simulations and plots
 def cellular(request):
-    # context = {}
     return render(request, 'carSimMain/cellular.html')
 
 
-def meshRender(request):
-    context = {}
+# Here we upload the mesh and parse its information and save in database
+def upload(request):
+    # context = {}
     if request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
-        context ['form'] = form
+        
+        form = UploadMeshForm(request.POST, request.FILES)
+        
         if form.is_valid():
+
             uploadedFile = request.FILES['file']
+            name = uploadedFile.name
             fs = FileSystemStorage()
-            uniqueName = createUniqueName(uploadedFile.name)
-            fs.save(uniqueName, uploadedFile)
-            context['url'] = fs.url(uniqueName)
-            vertexs, cells, normals, meshType, voiInitValues, params = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
-            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 'voiInitValues': voiInitValues, 'params': params}
-            context ['data'] = data
+            fs.save(name, uploadedFile)
+            # Parse mesh and save on the database
+
+            # TODO Here the read_buffer function of meshio does not work as np.fromfile seems to require a physically saved file and not just in memory
+            # one option seemed to do data = f.read() on _read_points under _vtk_51.py in mehsio and get the points with np.frombuffer()
+            # but this seems to take a lot of time so in processing for now I save the mesh read it in the server processed and delete it
+            # mesh = read_buffer(uploadedFile)
+            vertexs, render_elems, normals, elementType, stim_params, connections, fibers_long = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, name))
+            os.remove(os.path.join(settings.MEDIA_ROOT, name))
+
+            mesh_parsed = {'vertexs': vertexs, 'render_elems': render_elems, 'normals': normals, 'elementType': elementType, 
+                           'stim_params': stim_params, 'connections': connections, 'fibers_long': fibers_long}
+
+            name = name.split('.')[0]
+            path = os.path.join(settings.MEDIA_ROOT, "{}.pickle".format(name))
+            with open(path, 'wb') as f:
+                pickle.dump(mesh_parsed, f)
+
+            return redirect('/tissue')
+
     else:
-        form = UploadFileForm()
-        context ['form'] = form
+        form = UploadMeshForm()
 
 
-    return render(request, 'carSimMain/render.html', context)
+    return render(request, 'carSimMain/upload.html', {'form': form})
 
 
-def heat(request):
-    context = {}
-    if request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES)
-        context ['form'] = form
-        if form.is_valid():
-            uploadedFile = request.FILES['file']
-            fs = FileSystemStorage()
-            uniqueName = createUniqueName(uploadedFile.name)
-            fs.save(uniqueName, uploadedFile)
-            context['url'] = fs.url(uniqueName)
-            vertexs, cells, normals, meshType, voiInitValues, params = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, uniqueName))
-            data = {'vertexs':vertexs, 'cells':cells, 'normals':normals, 'meshType': meshType, 'voiInitValues': voiInitValues, 'params': params}
-            context ['data'] = data
-    else:
-        form = UploadFileForm()
-        context ['form'] = form
 
 
-    return render(request, 'carSimMain/heat.html', context)
+# # Here we upload the mesh and parse its information and save in database
+# def upload(request):
+#     # context = {}
+#     if request.method == 'POST':
+        
+#         form = UploadMeshForm(request.POST, request.FILES)
+        
+#         if form.is_valid():
+
+#             uploadedFile = request.FILES['file']
+#             name = uploadedFile.name
+#             fs = FileSystemStorage()
+#             fs.save(name, uploadedFile)
+
+#             # Parse mesh and save on the database
+#             # TODO this is too slow,
+#             vertexs, render_elems, normals, elementType, stim_params, connections, fibers_long = getDataFromMesh(os.path.join(settings.MEDIA_ROOT, name))
+#             os.remove(os.path.join(settings.MEDIA_ROOT, name))
+
+#             # Save on database
+#             print("Saving Mesh---------------------------------")
+#             mesh = Mesh.objects.create(name=name.split('.')[0])
+#             mesh.save()
+
+#             # Save points to the mesh
+#             # -xyz for rendering and computing
+#             # -connections for FD
+#             # -normals for lighting on renderization 
+#             # -fibers longitudinal vector
+#             # -stimulation mag, dur, start, period
+#             print("Saving Points and Point Data---------------------------------")
+#             for i in tqdm(range(len(vertexs))):
+#                 point = Point.objects.create(mesh=mesh, x=vertexs[i*3], y=vertexs[i*3+1], z=vertexs[i*3+2])
+#                 point.save()
+
+#                 if elementType=='line':
+#                     pointConnections = PointConnections1D.objects.create(point=point, iminus=connections[i*2], iplus=connections[i*2+1])
+#                     pointConnections.save()
+#                 elif elementType=='triangle':   # quads can be made triangles
+#                     pointConnections = PointConnections2D.objects.create(point=point, i_jplus=connections[i*8], iplus_jplus=connections[i*8+1], 
+#                                                                         iplus_j=connections[i*8+2], iplus_jminus=connections[i*8+3],
+#                                                                         i_jminus=connections[i*8+4], iminus_jminus=connections[i*8+5], 
+#                                                                         iminus_j=connections[i*8+6], iminus_jplus=connections[i*8+7])
+#                     pointConnections.save()
+#                 else:
+#                     raise ValueError("Mesh type should be line or triangles for now...")
+                
+#                 pointNormal = PointVector.objects.create(point=point, x=normals[i*3], y=normals[i*3+1], z=normals[i*3+2])
+#                 pointNormal.save()
+
+#                 pointFiber = PointVector.objects.create(point=point, x=fibers_long[i*3], y=fibers_long[i*3+1], z=fibers_long[i*3+2])
+#                 pointFiber.save()
+
+#                 pointStim = PointStim.objects.create(point=point, period=stim_params[i*4], mag=stim_params[i*4+1], dur=stim_params[i*4+2], start=stim_params[i*4+3])
+#                 pointStim.save()
+
+
+#             # Save elements to the mesh for FEM computation 
+#             # if elementType=='line':
+#             #     for i blabla:
+#             #         element = Element1D.objects.create(mesh=mesh)
+#             #         element.save()
+#             # elif elementType=='triangle': #quads can be made as triangles
+#             #     for i blabla:
+#             #         element = Element2D.objects.create(mesh=mesh)
+#             #         element.save()
+#             # elif elementType=='hexa':
+#             #     for i blabla:
+#             #         element = Element3D.objects.create(mesh=mesh)
+#             #         element.save()
+      
+
+#             # Save triangle elems for renderization
+#             print("Saving Render Elems ---------------------------------")
+#             if elementType=='line':
+#                 for i in tqdm(range(len(render_elems),2)):
+#                     element = Element1D.objects.create(mesh=mesh, left=render_elems[i], right=render_elems[i+1])
+#                     element.save()
+#             elif elementType=='triangle':
+#                 for i in tqdm(range(len(render_elems),3)):
+#                     element = RenderElementTriangle.objects.create(mesh=mesh, x=render_elems[i], y=render_elems[i+1], z=render_elems[i+2])
+#                     element.save()
+#             else:
+#                 raise ValueError("We only can render lines or triangles!")
+            
+#             return redirect('/tissue')
+
+
+#     else:
+#         form = UploadMeshForm()
+
+
+#     return render(request, 'carSimMain/upload.html', {'form': form})

@@ -44,7 +44,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
 
     // create arrays and buffers
-    const numberOfIndexes  = meshData.indexs.length;
+    const numberOfIndexes  = meshData.render_elems.length;
     const numberOfVertices = Math.trunc(meshData.vertexs.length / 3);
     const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfVertices);
     const voiInitValues    = new Float32Array(numberOfVertices);
@@ -90,7 +90,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     const vertexBuffer = createGPUBuffer(device, meshData.vertexs);
     const normalBuffer = createGPUBuffer(device, meshData.normals);
-    const indexBuffer  = createGPUBufferUint(device, meshData.indexs);
+    const indexBuffer  = createGPUBufferUint(device, meshData.render_elems);
     const voiBuffer    = createGPUBuffer(device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
     const stimBuffer   = createGPUBuffer(device, meshData.stim_params, GPUBufferUsage.STORAGE); //Check this Storage TODO
 

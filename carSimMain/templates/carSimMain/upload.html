@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<head>
+   <meta charset="utf-8">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+   <title>Carsim Upload</title>
+   <meta name="description" content="">
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+   <h1>CarSim: Upload your mesh to the database</h1><br>
+  
+   <div>
+      <form enctype="multipart/form-data" method="post">
+         {% csrf_token %}
+         {{ form }}  
+         <button type="submit" id='btn-uploadMesh'>Upload Mesh</button>
+     </form>
+
+   </div>
+
+
+</body>
+</html>

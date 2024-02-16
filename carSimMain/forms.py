@@ -1,4 +1,4 @@
 from django import forms
 
-class UploadFileForm(forms.Form):
+class UploadMeshForm(forms.Form):
     file = forms.FileField()

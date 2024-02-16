@@ -1,7 +1,7 @@
 import { CreateSurf} from './main_modules/createShapeSurf';
 import { CreateLine} from './main_modules/createShapeLine';
 import { LightInputsInterface } from './helpers/mysettings';
-import { checkWebGPU, GetColorFromVertexs, getDataFromDjango, meshObj } from './helpers/helper';
+import { checkWebGPU, GetColorFromVertexs, meshObj } from './helpers/helper';
 import $ from 'jquery';
 // import { GUI } from 'dat.gui';
 
@@ -30,17 +30,20 @@ $(document).ready(function(){
 });
 
 
-$('#btn-render').on('click',()=>{
+// TODO we need to re check the render and make the .html we can here show the nodetags 
+//  for example the stim_mags durs o lo que sea o si ponemos nodetags for imps like in opencarp or electra
 
-    const meshData:meshObj = getDataFromDjango(djangodata);
+// $('#btn-render').on('click',()=>{
 
-    if (meshData.meshType == "triangle"){
-        console.log("Surface Rendering")
-        let colors = GetColorFromVertexs(meshData.vertexs);
-        CreateSurf(meshData.vertexs, meshData.normals, meshData.indexs, colors, li);
-    }else if (meshData.meshType == "line") {
-        console.log("Line Rendering")
-        let colors = GetColorFromVertexs(meshData.vertexs);
-        CreateLine(meshData.vertexs, meshData.normals, meshData.indexs, colors, li)
-    }
-});
+//     const meshData:meshObj = getDataFromDjango(djangodata);
+
+//     if (meshData.elementType == "triangle"){
+//         console.log("Surface Rendering")
+//         let colors = GetColorFromVertexs(meshData.vertexs);
+//         CreateSurf(meshData.vertexs, meshData.normals, meshData.render_elems, colors, li);
+//     }else if (meshData.elementType == "line") {
+//         console.log("Line Rendering")
+//         let colors = GetColorFromVertexs(meshData.vertexs);
+//         CreateLine(meshData.vertexs, meshData.normals, meshData.render_elems, colors, li)
+//     }
+// });
