@@ -126,9 +126,15 @@ export const initGPU = async () => {
     // Request highest limit
     const device = await adapter.requestDevice({
         requiredLimits: { 
-            maxBufferSize: adapterLimits.maxBufferSize,
-            maxUniformBufferBindingSize: adapterLimits.maxUniformBufferBindingSize, 
-            maxStorageBufferBindingSize: adapterLimits.maxStorageBufferBindingSize
+            maxBufferSize:                     adapterLimits.maxBufferSize,
+            maxUniformBufferBindingSize:       adapterLimits.maxUniformBufferBindingSize, 
+            maxStorageBufferBindingSize:       adapterLimits.maxStorageBufferBindingSize,
+            maxComputeInvocationsPerWorkgroup: adapterLimits.maxComputeInvocationsPerWorkgroup,
+            maxComputeWorkgroupSizeX:          adapterLimits.maxComputeWorkgroupSizeX,
+            maxComputeWorkgroupSizeY:          adapterLimits.maxComputeWorkgroupSizeY,
+            maxComputeWorkgroupSizeZ:          adapterLimits.maxComputeWorkgroupSizeZ,
+            maxComputeWorkgroupStorageSize:    adapterLimits.maxComputeWorkgroupStorageSize,
+            maxComputeWorkgroupsPerDimension:  adapterLimits.maxComputeWorkgroupsPerDimension
         },
     }) as GPUDevice;
 

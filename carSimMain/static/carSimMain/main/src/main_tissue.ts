@@ -1,6 +1,6 @@
 import { SimLineMonodomain} from './main_modules/simLineMonodomain';
-import { SimSurfMonodomain} from './main_modules/simSurfMonodomain';
-import { SimSurfMonodomainParts } from './main_modules/simSurfMonodomainParts';
+import { SimSurfMonodomain} from './main_modules/simSurfMonodomainAtomics';
+// import { SimSurfMonodomain } from './main_modules/simSurfMonodomain';
 import { checkWebGPU, meshObj } from './helpers/helper';
 import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
@@ -58,36 +58,31 @@ $(document).ready(function(){
     initGUI4UniqueCellModel(gui, visualParams, "Tissue");
 });
 
-// TODO We need to add 2D and 3D as well as AP plot at least of 1, and EXMs
+// TODOs in order:
+// TODO check cell and line sims for avoid run-errors: Done! cell seems to not be affected so I leave it without
+// TODO add different resolutions
+// TODO add all cases of BC spatial derivatives in 2D
+// TODO add 3D
+// TODO add AP plot
+// TODO add pECGs
+// TODO Rewrite all in OOP (and names and labels to webgpu instances for error handling)
+// TODO add FEM (search for FEM in the project)
+// TODO add CS
+// TODO show stim regions on gui and made available the modification of those parameters
 
-// TODO we might need to rewrite all in OOP, with this a better handling of gpu limits and required limits in function of the experiments
 
-// TODO We also have to show stim regions on gui and made available the modification of those parameters
-// the stimulation buffer is already written (see up)  as it is constant and we use set data
 
-// TODO it seems to work with 360k but 6M nodes is to slow to pass from python to ts, check what can be done!!
+Notes:
+// We have two simSurfMonodomain for avoiding run-data errors:
+// 1- With Atomics which implies quantization from float to int as atomics operations are only supported by ints. This is just a little bit faster 
+// than the second approach but errors due to quatization should be measured even if they not seem important.
+// 2- in the other approach we separate the computation with two dispatches one for computing divG_gradV and the other for update V 
+// and compute the ionic part, this is just a little bit slower (we call to dispatches) but always we work with floats so no quatization
 
-// TODO check cell for avoid run-errors and also the Line simulation
-
-// TODO See If we can save some time but not calling that much dispatches works (now are 5)
-
-// TODO for adding FEM search for FEM in the project
-
-// TODO put the name to the buffers and all webgpu instances so when error arose we noe which buffer is
-
-// TODO check that the limits we are requering are ok maybe they are to much
-
-// TODO make SimSurfMonodomainParts mor efficient if we can
-
-// TODO try the 3D setting
-
-// TODO for now the size of the workgroups is constrained by the defaul minimum values we need to go to use the discrete gpu which supports better things
-// maybe for this reason this is to slow!!
-
-// TODO add different resolution otherwise we will die as it seems to slow yet
-
-// TODO database is too slow, for now we are going to read a pickle file with the data already preprocess and that is going to be passed to typescript
-
+// The loop for computing several dts and plot with plot_dt seems to not be possible as if we do it inside there is the problem that
+// Vms neighbouring to the node of interes are frozen to initial values and this gives distortion (como serrucho). Doing it outside in the draw
+// function simple lags the rendering and the improved in overall simulation time is almost null. So unless we manage to do the computation inside
+// one compute shader it seems unuseful to have plot_dt and the best option is to plot every dt 
 
 $('#btn-simulate').on('click', async ()=>{
 
@@ -97,8 +92,7 @@ $('#btn-simulate').on('click', async ()=>{
 
     if (meshData.elementType == "triangle"){
         console.log("Surface Monodomain Simulation")
-        // SimSurfMonodomain(gui, meshData, cellObj) 
-        SimSurfMonodomainParts(gui, meshData, cellObj) ;
+        SimSurfMonodomain(gui, meshData, cellObj);
     }else if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
         SimLineMonodomain(gui, meshData, cellObj)

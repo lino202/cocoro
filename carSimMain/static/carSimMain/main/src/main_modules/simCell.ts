@@ -51,7 +51,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
 
     const integ = {
         simulate: true,
-        dt : 0.1,
+        dt : 0.01,
         simulation_time : 0,
     }
     const integFolder = gui.addFolder('Integration');
@@ -71,6 +71,8 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     var tmp   = genInitArrays(visualParams.num_points);
     var vertexs = tmp.slice(0,visualParams.num_points*2);
     var voiInitValues = tmp.slice(visualParams.num_points*2,tmp.length);
+    // const voiInitValuesQuantized = new Int32Array(visualParams.num_points);
+    // voiInitValuesQuantized.fill(0);
 
     //Get canvases for axes
     const canvasX = document.getElementById("canvas_xAxis") as HTMLCanvasElement;
@@ -200,6 +202,10 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
         size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
+    // const quantizedVmBuffer = device.createBuffer({
+    //     size: Int32Array.BYTES_PER_ELEMENT * visualParams.num_points,
+    //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    // });
 
     // Result Matrix
     // const resultsBufferSize = Float32Array.BYTES_PER_ELEMENT * voiInitValues.length;
@@ -268,7 +274,15 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
                     },
-                }
+                },
+                // {
+                //     binding: 6,
+                //     resource: {
+                //         buffer: quantizedVmBuffer,
+                //         offset: 0,
+                //         size: Int32Array.BYTES_PER_ELEMENT * voiInitValuesQuantized.length,
+                //     },
+                // }
                 // {
                 //     binding: 6,
                 //     resource: {
@@ -291,6 +305,12 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
         0,
         statesArray
     );
+
+    // device.queue.writeBuffer(
+    //     quantizedVmBuffer,
+    //     0,
+    //     voiInitValuesQuantized
+    // );
 
     //Draw function for updating data on canvas and triggering gpu updates
     function draw() {

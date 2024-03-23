@@ -27,8 +27,11 @@ export const commonCellModelDefinitions = /*wgsl*/`
   @binding(3) @group(0) var<uniform> stim : Stim;
   @binding(4) @group(0) var<uniform> integ : Integration;
   @binding(5) @group(0) var<uniform> visual_params : VisualParams;
+  // @binding(6) @group(0) var<storage, read_write> quantized_vm  : array<atomic<i32>>;
   // @binding(6) @group(0) var<storage, read_write> results : array<f32>;
 
+  // const QUANTIZE_FACTOR = 32768.0;
+  // const DEQUANTIZE_FACTOR = 1.0 / 32768.0;
   var<private> current_compute_interval: f32;
 
 `;

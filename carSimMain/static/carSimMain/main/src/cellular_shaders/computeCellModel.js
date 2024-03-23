@@ -32,6 +32,8 @@ export function computeCellModel(cellModel) {
 
             // Vois not in the right tip of the line should just switch the value
             if (idx <= (arrayLength(&vois)-2)) {
+                // vois[idx] = f32(atomicLoad(&quantized_vm[idx+1])) * DEQUANTIZE_FACTOR;
+                // atomicStore(&quantized_vm[idx], i32(vois[idx] * QUANTIZE_FACTOR));
                 vois[idx] = vois[idx+1];
                 return;    
             }
@@ -65,6 +67,8 @@ export function computeCellModel(cellModel) {
                 vois[idx] = 1.0; //Plot a line in the top if this overflows
             }
             // results[idx] = vois[idx];
+
+            // atomicStore(&quantized_vm[idx], i32(vois[idx] * QUANTIZE_FACTOR));
         }
 
     `;
