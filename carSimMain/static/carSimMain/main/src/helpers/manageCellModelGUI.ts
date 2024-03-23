@@ -96,13 +96,15 @@ function changeCellTypes(newCellType:string, gui:GUI, simScale:string = "Cellula
 
 }
 
-export function initGUI4UniqueCellModel(gui:GUI, visualParams:Record<string,number>, simScale:string="Cellular"): void {
+export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,number>, visualParams:Record<string,number>, simScale:string="Cellular"): void {
     var cellModelsGui = { Cell_Model: 'Fenton_Karma'}
     var cellModelsType = { Cell_Type: 'BR'}
 
     //Dat.gui definition
-    const visualGUIFolder = gui.addFolder('Visualization');
-    const simGUIFolder    = gui.addFolder('IonicParams');
+    const gpuSettingsGUIFolder = gui.addFolder('gpuSettings');
+    const visualGUIFolder      = gui.addFolder('Visualization');
+    const simGUIFolder         = gui.addFolder('IonicParams');
+    Object.keys(gpuSettings).forEach((k) => {gpuSettingsGUIFolder.add(gpuSettings, k);});
     Object.keys(visualParams).forEach((k) => {visualGUIFolder.add(visualParams, k);});
     simGUIFolder.add(cellModelsGui, 'Cell_Model', ['Fenton_Karma','Gaur'] ).onChange(function(newValue){
         changeCellModel(newValue, gui, simScale);

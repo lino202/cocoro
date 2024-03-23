@@ -2,7 +2,7 @@ import { commonStructs, commonCellModelDefinitions } from './common.js';
 import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from './fenton_karma_wgsl.js'
 import { gaurDefinitions, gaurCoreCompute} from './gaur_wgsl.js'
 
-export function computeCellModel(cellModel) {
+export function computeCellModel(cellModel, workgroup_size) {
 
     var specificDefinitions;
     var specificComputeCore;
@@ -23,7 +23,7 @@ export function computeCellModel(cellModel) {
 
         ${commonCellModelDefinitions}
 
-        @compute @workgroup_size(64)
+        @compute @workgroup_size(${workgroup_size})
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             
             //Check for overcomputing and simulation stop

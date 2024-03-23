@@ -40,6 +40,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     });
 
     var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
+    var workgroup_size = gui.__folders.gpuSettings.__controllers[0].getValue();
 
     // create arrays and buffers
     const numberOfIndexes  = meshData.render_elems.length;
@@ -226,12 +227,12 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     // });
 
-    console.log(computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices))
+    console.log(computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices, workgroup_size))
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices),
+            code: computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices, workgroup_size),
           }),
           entryPoint: 'comp_monodomain_main',
         },
@@ -365,7 +366,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     function draw() {
 
         stats.begin();
-        if ((integ.simulation_time % 100 < integ.dt) && (integ.simulation_time % 100 > 0)){
+        if ((integ.simulation_time % 100 < plot_dt) && (integ.simulation_time % 100 > 0)){
             var stopTime = performance.now();
             console.log("Simulation time for computing 100 ms");
             console.log(stopTime - startTime);
@@ -373,7 +374,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         }
         
         //Update Params
-        if (integ.simulate){integ.simulation_time += integ.dt;}
+        if (integ.simulate){integ.simulation_time += plot_dt;}
 
         device.queue.writeBuffer(
             constantsBuffer,
@@ -411,7 +412,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(computePipeline);
             passEncoder.setBindGroup(0, computeBindGroup);
-            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices/64));
+            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices/workgroup_size));
             passEncoder.end();
         }
         {   //Render Update

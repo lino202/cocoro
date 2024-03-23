@@ -63,6 +63,8 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
         } 
     });
     var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
+    var workgroup_size = gui.__folders.gpuSettings.__controllers[0].getValue();
+
 
     const gpu = await initGPU();
     const device = gpu.device;
@@ -218,7 +220,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeCellModel(cellModel),
+            code: computeCellModel(cellModel, workgroup_size),
           }),
           entryPoint: 'comp_main',
         },
@@ -349,7 +351,7 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(computePipeline);
             passEncoder.setBindGroup(0, computeBindGroup);
-            passEncoder.dispatchWorkgroups(Math.ceil(visualParams.num_points / 64));
+            passEncoder.dispatchWorkgroups(Math.ceil(visualParams.num_points / workgroup_size));
             passEncoder.end();
         }
         {   //Render Update

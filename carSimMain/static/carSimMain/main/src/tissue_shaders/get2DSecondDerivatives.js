@@ -5,7 +5,6 @@ export function get2DSecondDerivatives(nNodes){
 
         if ( (i_j1 < ${nNodes}) & (i1_j1 < ${nNodes}) & (i1_j < ${nNodes}) & (i1_jminus1 < ${nNodes}) & (i_jminus1 < ${nNodes}) & (iminus1_jminus1 < ${nNodes}) & (iminus1_j < ${nNodes}) & (iminus1_j1 < ${nNodes}) ) {
             // here I am in the center of domain
-        
             d2dxdx_V = (states[iminus1_j].vm - 2 * states[idx].vm + states[i1_j].vm) / pow(integ.dx,2);
             d2dxdy_V = (states[i1_j1].vm - states[iminus1_j1].vm - states[i1_jminus1].vm + states[iminus1_jminus1].vm ) / (4 * pow(integ.dx, 2));
             d2dydy_V = (states[i_jminus1].vm - 2 * states[idx].vm + states[i_j1].vm) / pow(integ.dx,2);    
@@ -23,59 +22,50 @@ export function get2DSecondDerivatives(nNodes){
             
             if ( (i_j1<${nNodes}) & (i1_j1<${nNodes}) & (i1_j<${nNodes}) & (i1_jminus1<${nNodes}) & (i_jminus1<${nNodes}) & (iminus1_jminus1>=${nNodes}) & (iminus1_j>=${nNodes}) & (iminus1_j1>=${nNodes}) ) {
                 // Here I am in the left boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (2 * states[i1_j].vm - 2 * states[idx].vm ) / pow(integ.dx,2);
                 d2dydy_V = (states[i_jminus1].vm - 2 * states[idx].vm + states[i_j1].vm) / pow(integ.dx,2); 
                 d2dxdy_V = (states[i1_j1].vm - states[i1_jminus1].vm) / (2 * pow(integ.dx,2));
             }else if ( (i_j1<${nNodes}) & (i1_j1>=${nNodes}) & (i1_j>=${nNodes}) & (i1_jminus1>=${nNodes}) & (i_jminus1<${nNodes}) & (iminus1_jminus1<${nNodes}) & (iminus1_j<${nNodes}) & (iminus1_j1<${nNodes}) ) {
                 // Here I am in the right boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (2 * states[iminus1_j].vm - 2 * states[idx].vm ) / pow(integ.dx,2);
                 d2dydy_V = (states[i_jminus1].vm - 2 * states[idx].vm + states[i_j1].vm) / pow(integ.dx,2); 
                 d2dxdy_V = (states[iminus1_jminus1].vm - states[iminus1_j1].vm) / (2 * pow(integ.dx,2));
             }else if ( (i_j1>=${nNodes}) & (i1_j1>=${nNodes}) & (i1_j<${nNodes}) & (i1_jminus1<${nNodes}) & (i_jminus1<${nNodes}) & (iminus1_jminus1<${nNodes}) & (iminus1_j<${nNodes}) & (iminus1_j1>=${nNodes}) ) {
                 // Here I am in the up boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (states[iminus1_j].vm - 2 * states[idx].vm + states[i1_j].vm) / pow(integ.dx,2);
                 d2dydy_V =  (2 * states[i_jminus1].vm - 2 * states[idx].vm ) / pow(integ.dx,2); 
                 d2dxdy_V = (states[iminus1_jminus1].vm - states[i1_jminus1].vm) / (2 * pow(integ.dx,2));
             }else if ( (i_j1<${nNodes}) & (i1_j1<${nNodes}) & (i1_j<${nNodes}) & (i1_jminus1>=${nNodes}) & (i_jminus1>=${nNodes}) & (iminus1_jminus1>=${nNodes}) & (iminus1_j<${nNodes}) & (iminus1_j1<${nNodes}) ) {
                 // Here I am in the bottom boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (states[iminus1_j].vm - 2 * states[idx].vm + states[i1_j].vm) / pow(integ.dx,2);
                 d2dydy_V =  (2 * states[i_j1].vm - 2 * states[idx].vm ) / pow(integ.dx,2); 
                 d2dxdy_V = (states[i1_j1].vm - states[iminus1_j1].vm) / (2 * pow(integ.dx,2));
             }else if ( (i_j1<${nNodes}) & (i1_j1<${nNodes}) & (i1_j<${nNodes}) & (i1_jminus1>=${nNodes}) & (i_jminus1>=${nNodes}) & (iminus1_jminus1>=${nNodes}) & (iminus1_j>=${nNodes}) & (iminus1_j1>=${nNodes}) ) {
                 // Here I am in the bottom-left corner boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (2 * states[i1_j].vm - 2 * states[idx].vm) / pow(integ.dx,2);
                 d2dydy_V = (2 * states[i_j1].vm - 2 * states[idx].vm) / pow(integ.dx,2); 
                 d2dxdy_V = (states[i1_j1].vm - states[idx].vm) / pow(integ.dx,2);
             }else if ( (i_j1<${nNodes}) & (i1_j1>=${nNodes}) & (i1_j>=${nNodes}) & (i1_jminus1>=${nNodes}) & (i_jminus1>=${nNodes}) & (iminus1_jminus1>=${nNodes}) & (iminus1_j<${nNodes}) & (iminus1_j1<${nNodes}) ) {
                 // Here I am in the bottom-right corner boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (2 * states[iminus1_j].vm - 2 * states[idx].vm) / pow(integ.dx,2);
                 d2dydy_V = (2 * states[i_j1].vm - 2 * states[idx].vm) / pow(integ.dx,2); 
                 d2dxdy_V = (states[idx].vm - states[iminus1_j1].vm) / pow(integ.dx,2);
             }else if ( (i_j1>=${nNodes}) & (i1_j1>=${nNodes}) & (i1_j>=${nNodes}) & (i1_jminus1>=${nNodes}) & (i_jminus1<${nNodes}) & (iminus1_jminus1<${nNodes}) & (iminus1_j<${nNodes}) & (iminus1_j1>=${nNodes}) ) {
                 // Here I am in the up-right corner boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (2 * states[iminus1_j].vm - 2 * states[idx].vm) / pow(integ.dx,2);
                 d2dydy_V = (2 * states[i_jminus1].vm - 2 * states[idx].vm) / pow(integ.dx,2); 
                 d2dxdy_V = (states[iminus1_jminus1].vm - states[idx].vm) / pow(integ.dx,2);
             }else if ( (i_j1>=${nNodes}) & (i1_j1>=${nNodes}) & (i1_j<${nNodes}) & (i1_jminus1<${nNodes}) & (i_jminus1<${nNodes}) & (iminus1_jminus1>=${nNodes}) & (iminus1_j>=${nNodes}) & (iminus1_j1>=${nNodes}) ) {
                 // Here I am in the up-left corner boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
                 d2dxdx_V = (2 * states[i1_j].vm - 2 * states[idx].vm) / pow(integ.dx,2);
                 d2dydy_V = (2 * states[i_jminus1].vm - 2 * states[idx].vm) / pow(integ.dx,2); 
                 d2dxdy_V = (states[idx].vm - states[i1_jminus1].vm) / pow(integ.dx,2);
-            }else if ( (i_j1<${nNodes}) & (i1_j1<${nNodes}) & (i1_j<${nNodes}) & (i1_jminus1>=${nNodes}) & (i_jminus1<${nNodes}) & (iminus1_jminus1<${nNodes}) & (iminus1_j<${nNodes}) & (iminus1_j1<${nNodes}) ) {
-                // Here I am in the inner up-left corner boundary
-                // Get d2dxdx_V, d2dydy_V and d2dxdy_V = d2dydx_V
+            }else{
+                // Here I am in the inner corners
                 d2dxdx_V = (states[iminus1_j].vm - 2 * states[idx].vm + states[i1_j].vm) / pow(integ.dx,2);
                 d2dydy_V = (states[i_jminus1].vm - 2 * states[idx].vm + states[i_j1].vm) / pow(integ.dx,2);    
-                d2dxdy_V = (states[iminus1_jminus1].vm - states[iminus1_j1].vm) / (2*pow(integ.dx,2));
-            }// TODO Also inner up-right, bottom-right, bottom-left and inners arriving to the change line
+                d2dxdy_V = 0.0; // Is this right?? TODO test square donut or analyze how d2dxdy should be in inner corner nodes!
+            }
         }
 
     `;

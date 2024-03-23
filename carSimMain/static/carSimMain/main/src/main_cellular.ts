@@ -13,6 +13,9 @@ const visualParams = {
     plot_dt  : 1,     // This should be in ms if dt is in ms
     num_points : 3000
 }
+const gpuSettings = {
+    workgroup_size   : 64,
+}
 const gui = new GUI();
 
 
@@ -25,7 +28,7 @@ const gui = new GUI();
 
 $(document).ready(function(){
     console.log("WE ARE READY!!");
-    initGUI4UniqueCellModel(gui, visualParams);
+    initGUI4UniqueCellModel(gui, gpuSettings, visualParams);
 });
 
 $('#btn-simulate').on('click',()=>{

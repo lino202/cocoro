@@ -2,7 +2,7 @@ import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shad
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
 import { get2DSecondDerivatives } from './get2DSecondDerivatives.js';
 
-export function computeShaderMonodomainSurf(cellModel, nNodes){
+export function computeShaderMonodomainSurf(cellModel, nNodes, workgroup_size){
 
     var specificDefinitions;
     var specificComputeCore;
@@ -70,8 +70,9 @@ export function computeShaderMonodomainSurf(cellModel, nNodes){
 
         const QUANTIZE_FACTOR = 32768.0;
         const DEQUANTIZE_FACTOR = 1.0 / 32768.0;
+        var<private> current_compute_interval: f32;
 
-        @compute @workgroup_size(64)
+        @compute @workgroup_size(${workgroup_size})
         fn comp_monodomain_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             
             //Check for overcomputing and simulation stop
@@ -100,32 +101,38 @@ export function computeShaderMonodomainSurf(cellModel, nNodes){
             var d2dydy_V:f32 = 0.0;    
             var d2dxdy_V:f32 = 0.0;
             // d2dxdy_V = d2dydx_V
-
-            ${secondDerivativesShader}
-
-            var ddx_A:f32 = d2dxdx_V * sigma_xx + d2dxdy_V * sigma_xy; 
-            var ddy_B:f32 = d2dxdy_V * sigma_yx + d2dydy_V * sigma_yy;
-            var divG_gradV:f32 = ddx_A + ddy_B;
-
-            // Get the stimulation current
-            var i_stim:f32 = 0.0;
-            if ((states[idx].t >= stim[idx].start) & (states[idx].t < stim[idx].start+stim[idx].dur)){i_stim = -stim[idx].amp;}
-            if ((states[idx].t >= stim[idx].period+stim[idx].start) & (((states[idx].t - stim[idx].start) % stim[idx].period) < stim[idx].dur)){i_stim = -stim[idx].amp;}
             
-            // Compute reaction/ionic term by defining the curr_Iion
-            // Note: We defined Beta, Cm and the sigma_long in the constants of the cell model
-            // if we think logically those are common params to the cell type that can be defining one single cell
-            // or tissue with unique cellType. So constants are unique for all nodes but the states should be repetead for all nodes -> array
-            ${specificComputeCore}
-            
-            
-            // Get new Vm value, by quatizing
-            let quantizedValue:i32 = i32(((((divG_gradV*100000)/(constants.beta*constants.cm)) - ((curr_Iion+i_stim)/constants.cm)) * integ.dt) * QUANTIZE_FACTOR);
-            atomicAdd(&quantized_vm[idx], quantizedValue);
-            states[idx].vm = f32(atomicLoad(&quantized_vm[idx])) * DEQUANTIZE_FACTOR;
-            states[idx].t += integ.dt;
+            current_compute_interval = trunc(states[idx].t/visual_params.plot_dt);
+            loop{
+
+                ${secondDerivativesShader}
+
+                var ddx_A:f32 = d2dxdx_V * sigma_xx + d2dxdy_V * sigma_xy; 
+                var ddy_B:f32 = d2dxdy_V * sigma_yx + d2dydy_V * sigma_yy;
+                var divG_gradV:f32 = ddx_A + ddy_B;
+
+                // Get the stimulation current
+                var i_stim:f32 = 0.0;
+                if ((states[idx].t >= stim[idx].start) & (states[idx].t < stim[idx].start+stim[idx].dur)){i_stim = -stim[idx].amp;}
+                if ((states[idx].t >= stim[idx].period+stim[idx].start) & (((states[idx].t - stim[idx].start) % stim[idx].period) < stim[idx].dur)){i_stim = -stim[idx].amp;}
+                
+                // Compute reaction/ionic term by defining the curr_Iion
+                // Note: We defined Beta, Cm and the sigma_long in the constants of the cell model
+                // if we think logically those are common params to the cell type that can be defining one single cell
+                // or tissue with unique cellType. So constants are unique for all nodes but the states should be repetead for all nodes -> array
+                ${specificComputeCore}
+                
+                
+                // Get new Vm value, by quatizing
+                let quantizedValue:i32 = i32(((((divG_gradV*100000)/(constants.beta*constants.cm)) - ((curr_Iion+i_stim)/constants.cm)) * integ.dt) * QUANTIZE_FACTOR);
+                atomicAdd(&quantized_vm[idx], quantizedValue);
+                states[idx].vm = f32(atomicLoad(&quantized_vm[idx])) * DEQUANTIZE_FACTOR;
+                states[idx].t += integ.dt;
+                
+                if ( trunc(states[idx].t/visual_params.plot_dt) != current_compute_interval) {break;}
+
+            }
             // results[idx] = states[idx].vm;
-
             //Pass to vois and normalize for plotting    
             // If vm is out of the Voi max min range we would have a magenta color
             vois[idx] = (states[idx].vm - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min);                  

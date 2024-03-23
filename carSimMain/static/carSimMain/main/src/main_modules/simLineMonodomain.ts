@@ -28,7 +28,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     
     const integ = {
         simulate: true,
-        dt : 0.1,     //[ms]
+        dt : 0.01,     //[ms]
         dx : 100,     //Mesh edglength [um] 
         simulation_time : 0,
     }
@@ -43,6 +43,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     });
 
     var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
+    var workgroup_size = gui.__folders.gpuSettings.__controllers[0].getValue();
 
     // create buffers
     const numberOfIndexes  = meshData.render_elems.length;
@@ -50,6 +51,8 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfVertices);
     const voiInitValues    = new Float32Array(numberOfVertices);
     voiInitValues.fill(cellObj.states.vm)
+    const voiInitValuesQuantized = new Int32Array(numberOfVertices);
+    voiInitValuesQuantized.fill(cellObj.states.vm * 32768);
 
     const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices)
     const constantsArray    = new Float32Array(Object.values(cellObj.constants))
@@ -61,6 +64,10 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     const statesBuffer = device.createBuffer({
         size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const quantizedVmBuffer = device.createBuffer({
+        size: Int32Array.BYTES_PER_ELEMENT * numberOfVertices,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
     const constantsBuffer = device.createBuffer({
@@ -212,12 +219,12 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     // });
 
-    // console.log(computeShaderMonodomainLine(cellObj.cellModel))
+    console.log(computeShaderMonodomainLine(cellObj.cellModel, numberOfVertices, workgroup_size))
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainLine(cellObj.cellModel),
+            code: computeShaderMonodomainLine(cellObj.cellModel, numberOfVertices, workgroup_size),
           }),
           entryPoint: 'comp_monodomain_main',
         },
@@ -253,13 +260,21 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                 {
                     binding: 3,
                     resource: {
+                        buffer: quantizedVmBuffer,
+                        offset: 0,
+                        size: Int32Array.BYTES_PER_ELEMENT * numberOfVertices,
+                    },
+                },
+                {
+                    binding: 4,
+                    resource: {
                         buffer: constantsBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
                     },
                 },
                 {
-                    binding: 4,
+                    binding: 5,
                     resource: {
                         buffer: integBuffer,
                         offset: 0,
@@ -267,15 +282,15 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     },
                 },
                 {
-                    binding: 5,
+                    binding: 6,
                     resource: {
                         buffer: visualParamsBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
                     },
-                }
+                },
                 // {
-                //     binding: 6,
+                //     binding: 7,
                 //     resource: {
                 //         buffer: resultMatrixBuffer,
                 //         offset: 0,
@@ -301,6 +316,12 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         statesBuffer,
         0,
         statesArray
+    );
+
+    device.queue.writeBuffer(
+        quantizedVmBuffer,
+        0,
+        voiInitValuesQuantized
     );
 
     //Draw function for updating data on canvas and triggering gpu updates
@@ -347,7 +368,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(computePipeline);
             passEncoder.setBindGroup(0, computeBindGroup);
-            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices / 64));
+            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices / workgroup_size));
             passEncoder.end();
         }
         {   //Render Update

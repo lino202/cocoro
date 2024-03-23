@@ -11,12 +11,14 @@ import { Parser } from 'pickleparser'
 const visualParams = {
     voiMax   : 60,
     voiMin   : -100,
-    plot_dt  : 1,     // This should be in ms if dt is in ms
+    plot_dt  : 0.5,     // This should be in ms if dt is in ms
     // num_points : 3000
 }
+
+const gpuSettings = {
+    workgroup_size   : 64,
+}
 const gui = new GUI();
-declare let meshData: meshObj;
-declare const path: string;
 
 // Functions -------------------
 
@@ -55,20 +57,20 @@ async function getMeshData() {
 
 $(document).ready(function(){
     console.log("WE ARE READY!!");
-    initGUI4UniqueCellModel(gui, visualParams, "Tissue");
+    initGUI4UniqueCellModel(gui, gpuSettings, visualParams, "Tissue");
 });
 
-// TODOs in order:
-// TODO check cell and line sims for avoid run-errors: Done! cell seems to not be affected so I leave it without
-// TODO add different resolutions
-// TODO add all cases of BC spatial derivatives in 2D
+// MAIN TODOs in order:
 // TODO add 3D
+// TODO add different resolutions dx
 // TODO add AP plot
 // TODO add pECGs
 // TODO Rewrite all in OOP (and names and labels to webgpu instances for error handling)
-// TODO add FEM (search for FEM in the project)
+// TODO add FEM (search for FEM in the project) see continuos and discontinous (might be better for GPU) Galerkin methods
 // TODO add CS
 // TODO show stim regions on gui and made available the modification of those parameters
+// TODO stim with click
+// see secondary TODOs around in code
 
 
 
@@ -76,6 +78,8 @@ Notes:
 // We have two simSurfMonodomain for avoiding run-data errors:
 // 1- With Atomics which implies quantization from float to int as atomics operations are only supported by ints. This is just a little bit faster 
 // than the second approach but errors due to quatization should be measured even if they not seem important.
+// If we decide to remain with atomics the divG_gradV cellular parameter can be erased!!! saving memory! for now Atomics is the only option for 1D and in 2D we have both
+// So if we decide to go ahead with atomics we should erase the cell parameter divG_gradV and erase simSufrMonodomain and make the Atomics version the default in 2D
 // 2- in the other approach we separate the computation with two dispatches one for computing divG_gradV and the other for update V 
 // and compute the ionic part, this is just a little bit slower (we call to dispatches) but always we work with floats so no quatization
 
@@ -83,6 +87,8 @@ Notes:
 // Vms neighbouring to the node of interes are frozen to initial values and this gives distortion (como serrucho). Doing it outside in the draw
 // function simple lags the rendering and the improved in overall simulation time is almost null. So unless we manage to do the computation inside
 // one compute shader it seems unuseful to have plot_dt and the best option is to plot every dt 
+// The loop in the compute shader should be there otherwise is too slow. For avoiding serrucho If we reduce plot_dt to 0.5 the distortion 
+// almost completely vanished! So we remain using the loop for speed, atomics for racing errors and plot_dt (and also dt) regulates error and speed
 
 $('#btn-simulate').on('click', async ()=>{
 
