@@ -32,7 +32,6 @@ export const gaurDefinitions = /*wgsl*/`
         I_Na__m : f32,
         ionic_concentrations__cansr : f32,
         t : f32,
-        divG_gradV : f32,
     }
 
     struct Constants {

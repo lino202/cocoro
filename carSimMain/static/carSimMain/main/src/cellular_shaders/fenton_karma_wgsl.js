@@ -6,7 +6,6 @@ export const fentonKarmaDefinitions = /*wgsl*/`
         w  : f32,
         vm : f32,
         t  : f32,
-        divG_gradV : f32,
     }
 
     struct Constants {

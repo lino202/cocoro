@@ -41,14 +41,11 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size) {
         @binding(0) @group(0) var<storage, read_write> vois : array<f32>;
         @binding(1) @group(0) var<storage, read_write> stim : array<Stim, ${nNodes}>;
         @binding(2) @group(0) var<storage, read_write> states : array<States, ${nNodes}>;
-        @binding(3) @group(0) var<storage, read_write> quantized_vm  : array<atomic<i32>, ${nNodes}>;
-        @binding(4) @group(0) var<uniform>             constants : Constants;
-        @binding(5) @group(0) var<uniform>             integ : Integration;
-        @binding(6) @group(0) var<uniform>             visual_params : VisualParams;
-        // @binding(7) @group(0) var<storage, read_write> results : array<f32>;
+        @binding(3) @group(0) var<uniform>             constants : Constants;
+        @binding(4) @group(0) var<uniform>             integ : Integration;
+        @binding(5) @group(0) var<uniform>             visual_params : VisualParams;
+        // @binding(6) @group(0) var<storage, read_write> results : array<f32>;
 
-        const QUANTIZE_FACTOR = 32768.0;
-        const DEQUANTIZE_FACTOR = 1.0 / 32768.0;
         var<private> current_compute_interval: f32;
 
         @compute @workgroup_size(${workgroup_size})
@@ -86,9 +83,7 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size) {
                 ${specificComputeCore}
 
                 // Get new Vm value, by quatizing
-                let quantizedValue:i32 = i32((((d2dxdx_V*lambda) - ((curr_Iion+i_stim)/constants.cm)) * integ.dt) * QUANTIZE_FACTOR);
-                atomicAdd(&quantized_vm[idx], quantizedValue);
-                states[idx].vm = f32(atomicLoad(&quantized_vm[idx])) * DEQUANTIZE_FACTOR;
+                states[idx].vm += ((d2dxdx_V*lambda) - ((curr_Iion+i_stim)/constants.cm)) * integ.dt;
                 states[idx].t += integ.dt;
 
                 if ( trunc(states[idx].t/visual_params.plot_dt) != current_compute_interval) {break;}

@@ -33,7 +33,6 @@ export const cellModelParamsGaur = {
         I_Na__m : 0.0022,
         ionic_concentrations__cansr : 1.37,
         t : 0,
-        divG_gradV: 0,
     },
     constants:{
         cm : 1,           //units uF/cm2

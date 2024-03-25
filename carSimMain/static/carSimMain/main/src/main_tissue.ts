@@ -1,6 +1,5 @@
 import { SimLineMonodomain} from './main_modules/simLineMonodomain';
-import { SimSurfMonodomain} from './main_modules/simSurfMonodomainAtomics';
-// import { SimSurfMonodomain } from './main_modules/simSurfMonodomain';
+import { SimSurfMonodomain} from './main_modules/simSurfMonodomain';
 import { checkWebGPU, meshObj } from './helpers/helper';
 import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
@@ -11,7 +10,7 @@ import { Parser } from 'pickleparser'
 const visualParams = {
     voiMax   : 60,
     voiMin   : -100,
-    plot_dt  : 0.5,     // This should be in ms if dt is in ms
+    plot_dt  : 0.2,     // This should be in ms if dt is in ms
     // num_points : 3000
 }
 
@@ -75,20 +74,18 @@ $(document).ready(function(){
 
 
 Notes:
-// We have two simSurfMonodomain for avoiding run-data errors:
-// 1- With Atomics which implies quantization from float to int as atomics operations are only supported by ints. This is just a little bit faster 
-// than the second approach but errors due to quatization should be measured even if they not seem important.
-// If we decide to remain with atomics the divG_gradV cellular parameter can be erased!!! saving memory! for now Atomics is the only option for 1D and in 2D we have both
-// So if we decide to go ahead with atomics we should erase the cell parameter divG_gradV and erase simSufrMonodomain and make the Atomics version the default in 2D
-// 2- in the other approach we separate the computation with two dispatches one for computing divG_gradV and the other for update V 
-// and compute the ionic part, this is just a little bit slower (we call to dispatches) but always we work with floats so no quatization
+// For finite differences we avoided operator splitting as this yielded a more compliant code that could be run in a compute shader
+// and reduce/erase the data-run problems due to several threads accesses to the same variable.
 
-// The loop for computing several dts and plot with plot_dt seems to not be possible as if we do it inside there is the problem that
-// Vms neighbouring to the node of interes are frozen to initial values and this gives distortion (como serrucho). Doing it outside in the draw
-// function simple lags the rendering and the improved in overall simulation time is almost null. So unless we manage to do the computation inside
-// one compute shader it seems unuseful to have plot_dt and the best option is to plot every dt 
-// The loop in the compute shader should be there otherwise is too slow. For avoiding serrucho If we reduce plot_dt to 0.5 the distortion 
-// almost completely vanished! So we remain using the loop for speed, atomics for racing errors and plot_dt (and also dt) regulates error and speed
+// We have a loop for computing several dts inside the compute shaders. The amount of dts to compute before rendering is define by plot_dt
+// as compute steps = plot_dt/dt. I think doing this has a problem which is that Vms neighbouring to the node of interest being processed in a thread 
+// are frozen to initial values or not updating synchronously and this gives distortion. For example if plot_dt is high as 1 ms, the rendering gets slow 
+// (fps drops obviously) and more importantly a distortion in Vms computation appears, saw-tooth in the wavefront, as spatial gradients computation have higher
+// error due to unsynchronization of Vms values reading and writing among different threads. 
+// We tried doing the plot_dt loop in the draw function (outside the gpu, outside the shader) but it lags the rendering and the improvement 
+// in overall simulation time if compared with plot_dt=dt is almost null. 
+// Conclusion: The loop in the compute shader should be there otherwise is too slow. For avoiding saw-tooth a treadoff is the only option now -> if we reduce plot_dt 
+// to 0.2 the distortion almost completely vanished! Now plot_dt=0.02 you have exact solution but slow, plot_dt=0.2 error unperceptible faster (default), plot_dt=1 faster/fastest but saw-tooth
 
 $('#btn-simulate').on('click', async ()=>{
 

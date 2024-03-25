@@ -2,17 +2,14 @@ import { createTransforms, createViewProjection, meshObj} from '../helpers/helpe
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
-import { computeShaderMonodomainDivG_GradV, computeShaderMonodomainSurf} from '../tissue_shaders/simSurfMonodomainShader.js';
+import { computeShaderMonodomainSurf } from '../tissue_shaders/simSurfMonodomainShader.js';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
 
 const createCamera =require('3d-view-controls')
 
-// This simulates line without Light as it is not neccessary
-// Voi refers to Variable of interest
 export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj) => {
-    
     
     console.log("RENDERING AND SIMULATING SURFACE");
     console.log("SIMULATING CELL MODEL:");
@@ -27,10 +24,9 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     
     const integ = {
         simulate: true,
-        dt : 0.01,     //[ms]
+        dt : 0.02,     //[ms]
         dx : 100,     //Mesh edglength [um] 
         simulation_time : 0,
-        debug_init_time : 100000
     }
     const integFolder = gui.addFolder('Integration');
     Object.keys(integ).forEach((k) => {
@@ -42,13 +38,14 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     });
 
     var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
+    var workgroup_size = gui.__folders.gpuSettings.__controllers[0].getValue();
 
     // create arrays and buffers
     const numberOfIndexes  = meshData.render_elems.length;
     const numberOfVertices = Math.trunc(meshData.vertexs.length / 3);
     const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfVertices);
     const voiInitValues    = new Float32Array(numberOfVertices);
-    voiInitValues.fill(cellObj.states.vm); //TODO scale this here
+    voiInitValues.fill(cellObj.states.vm)
 
     const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices);
     const constantsArray    = new Float32Array(Object.values(cellObj.constants));
@@ -213,95 +210,28 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         }
     };
 
-    // COMPUTE PIPELINES ---------------------------------------------------
+    // COMPUTE PIPELINE ---------------------------------------------------
 
-    // Result Matrix
-    const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * numberOfVertices;
-    const resultBuffer1 = device.createBuffer({
-        size: resultMatrixBufferSize,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
-    });
-    const resultBuffer2 = device.createBuffer({
-        size: resultMatrixBufferSize,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
-    });
+    // // Result Matrix
+    // const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * numberOfVertices;
+    // const resultMatrixBuffer = device.createBuffer({
+    //     size: resultMatrixBufferSize,
+    //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+    // });
 
-    const computePipelineDivG_GradV = device.createComputePipeline({
+    console.log(computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices, workgroup_size))
+    const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainDivG_GradV(cellObj.cellModel, numberOfVertices),
+            code: computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices, workgroup_size),
           }),
-          entryPoint: 'comp_main',
+          entryPoint: 'comp_monodomain_main',
         },
     });
 
-    const computeBindGroupDivG_GradV = device.createBindGroup({
-        layout: computePipelineDivG_GradV.getBindGroupLayout(0),
-            entries: [
-                {
-                    binding: 0,
-                    resource: {
-                        buffer: statesBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
-                    },
-                },
-                {
-                    binding: 1,
-                    resource: {
-                        buffer: fiberOrientationBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * fiberOrientationArray.length,
-                    },
-                },
-                {
-                    binding: 2,
-                    resource: {
-                        buffer: connectionsBuffer,
-                        offset: 0,
-                        size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
-                    },
-                },
-                {
-                    binding: 3,
-                    resource: {
-                        buffer: constantsBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
-                    },
-                },
-                {
-                    binding: 4,
-                    resource: {
-                        buffer: integBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * integrationArray.length,
-                    },
-                },
-                {
-                    binding: 5,
-                    resource: {
-                        buffer: resultBuffer1,
-                        offset: 0,
-                    },
-                }
-            ],
-    });
-
-
-    const computePipelineMain = device.createComputePipeline({
-        layout: 'auto',
-        compute: {
-          module: device.createShaderModule({
-            code: computeShaderMonodomainSurf(cellObj.cellModel,numberOfVertices),
-          }),
-          entryPoint: 'comp_main',
-        },
-    });
-
-    const computeBindGroupMain = device.createBindGroup({
-        layout: computePipelineMain.getBindGroupLayout(0),
+    const computeBindGroup = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
             entries: [
                 {
                     binding: 0,
@@ -314,13 +244,37 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                 {
                     binding: 1,
                     resource: {
+                        buffer: stimBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices * stimParamsNum,
+                    },
+                },
+                {
+                    binding: 2,
+                    resource: {
                         buffer: statesBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
                     },
                 },
                 {
-                    binding: 2,
+                    binding: 3,
+                    resource: {
+                        buffer: fiberOrientationBuffer,
+                        offset: 0,
+                        size: Float32Array.BYTES_PER_ELEMENT * fiberOrientationArray.length,
+                    },
+                },
+                {
+                    binding: 4,
+                    resource: {
+                        buffer: connectionsBuffer,
+                        offset: 0,
+                        size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
+                    },
+                },
+                {
+                    binding: 5,
                     resource: {
                         buffer: constantsBuffer,
                         offset: 0,
@@ -328,7 +282,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     },
                 },
                 {
-                    binding: 3,
+                    binding: 6,
                     resource: {
                         buffer: integBuffer,
                         offset: 0,
@@ -336,28 +290,21 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     },
                 },
                 {
-                    binding: 4,
+                    binding: 7,
                     resource: {
                         buffer: visualParamsBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
                     },
                 },
-                {
-                    binding: 5,
-                    resource: {
-                        buffer: stimBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices * stimParamsNum,
-                    },
-                },
-                {
-                    binding: 6,
-                    resource: {
-                        buffer: resultBuffer2,
-                        offset: 0,
-                    },
-                }
+
+                // {
+                //     binding: 8,
+                //     resource: {
+                //         buffer: resultMatrixBuffer,
+                //         offset: 0,
+                //     },
+                // }
             ],
     });
 
@@ -394,10 +341,10 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     //Draw function for updating data on canvas and triggering gpu updates
     var startTime = performance.now();
-    async function draw() {
+    function draw() {
 
         stats.begin();
-        if ((integ.simulation_time % 100 < integ.dt) && (integ.simulation_time % 100 > 0)){
+        if ((integ.simulation_time % 100 < plot_dt) && (integ.simulation_time % 100 > 0)){
             var stopTime = performance.now();
             console.log("Simulation time for computing 100 ms");
             console.log(stopTime - startTime);
@@ -405,7 +352,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         }
         
         //Update Params
-        if (integ.simulate){integ.simulation_time += integ.dt;}
+        if (integ.simulate){integ.simulation_time += plot_dt;}
 
         device.queue.writeBuffer(
             constantsBuffer,
@@ -421,7 +368,6 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
               integ.dx  
             ])
         );
-       
 
         // Update camera
         if(camera.tick()){  
@@ -440,21 +386,13 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         //Generate the command encoder for both pipelines (Render and Compute)
         //and send them to the gpu
         const commandEncoder = device.createCommandEncoder();
-        {   //Compute Update Diffusion
+        {   //Compute Update
             const passEncoder = commandEncoder.beginComputePass();
-            passEncoder.setPipeline(computePipelineDivG_GradV);
-            passEncoder.setBindGroup(0, computeBindGroupDivG_GradV);
-            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices/64));
+            passEncoder.setPipeline(computePipeline);
+            passEncoder.setBindGroup(0, computeBindGroup);
+            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices/workgroup_size));
             passEncoder.end();
         }
-        {
-            const passEncoder = commandEncoder.beginComputePass();
-            passEncoder.setPipeline(computePipelineMain);
-            passEncoder.setBindGroup(0, computeBindGroupMain);
-            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices/64));
-            passEncoder.end();
-        }
-        // if ((integ.simulation_time % plot_dt < integ.dt) && (integ.simulation_time % plot_dt > 0)){ MAL
         {   //Render Update
             textureView = gpu.context.getCurrentTexture().createView();
             renderPassDescription.colorAttachments[0].view = textureView;
@@ -469,63 +407,42 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             passEncoder.drawIndexed(numberOfIndexes);
             passEncoder.end();
         }
-        // }
-        // device.queue.submit([commandEncoder.finish()]);
+        device.queue.submit([commandEncoder.finish()]);
+
+        stats.end();
+
+        requestAnimationFrame(draw)
+
+        // // RESULTS Get a GPU buffer for reading in an unmapped state.
+        // const gpuReadBuffer = device.createBuffer({
+        //     size: resultMatrixBufferSize,
+        //     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+        // });
+
+        // // Encode commands for copying buffer to buffer.
+        // commandEncoder.copyBufferToBuffer(
+        //     resultMatrixBuffer /* source buffer */,
+        //     0 /* source offset */,
+        //     gpuReadBuffer /* destination buffer */,
+        //     0 /* destination offset */,
+        //     resultMatrixBufferSize /* size */
+        // );
+
+        // // Submit GPU commands.
+        // const gpuCommands = commandEncoder.finish();
+        // device.queue.submit([gpuCommands]);
 
         // stats.end();
 
-        // requestAnimationFrame(draw)
-                
-        if ( integ.simulation_time > integ.debug_init_time ) {
-            // RESULTS Get a GPU buffer for reading in an unmapped state.
-            const gpuReadBuffer1 = device.createBuffer({
-                size: resultMatrixBufferSize,
-                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-            });
-            const gpuReadBuffer2 = device.createBuffer({
-                size: resultMatrixBufferSize,
-                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-            });
-
-            // Encode commands for copying buffer to buffer.
-            commandEncoder.copyBufferToBuffer(
-                resultBuffer1 /* source buffer */,
-                0 /* source offset */,
-                gpuReadBuffer1 /* destination buffer */,
-                0 /* destination offset */,
-                resultMatrixBufferSize /* size */
-            );
-            commandEncoder.copyBufferToBuffer(
-                resultBuffer2 /* source buffer */,
-                0 /* source offset */,
-                gpuReadBuffer2 /* destination buffer */,
-                0 /* destination offset */,
-                resultMatrixBufferSize /* size */
-            );
-           
-            // Submit GPU commands.
-            const gpuCommands = commandEncoder.finish();
-            device.queue.submit([gpuCommands]);
-
-            // Read buffer.
-            await gpuReadBuffer1.mapAsync(GPUMapMode.READ);
-            const arrayBuffer1 = gpuReadBuffer1.getMappedRange();
-            await gpuReadBuffer2.mapAsync(GPUMapMode.READ);
-            const arrayBuffer2 = gpuReadBuffer2.getMappedRange();
-            console.log(new Float32Array(arrayBuffer1));
-            console.log(new Float32Array(arrayBuffer2));
-
-        
-        }else{
-            // Submit GPU commands.
-            const gpuCommands = commandEncoder.finish();
-            device.queue.submit([gpuCommands]);
-        }
-
-        stats.end();
+        // // Read buffer.
+        // await gpuReadBuffer.mapAsync(GPUMapMode.READ);
+        // const arrayBuffer = gpuReadBuffer.getMappedRange();
+        // // if ((integ.simulation_time > 80) && (integ.simulation_time < 120)) {
+        // console.log(new Float32Array(arrayBuffer));
+        // // }   
         
 
-        requestAnimationFrame(draw);
+        // requestAnimationFrame(draw);
 
     }
 

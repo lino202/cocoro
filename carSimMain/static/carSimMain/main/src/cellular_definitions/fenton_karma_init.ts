@@ -12,7 +12,6 @@ export const cellModelParamsFKBR = {
         w : 1,
         vm : -85,
         t : 0,
-        divG_gradV: 0,
     },
     constants:{
         Cm : 1,           //units uF/cm2
@@ -52,7 +51,6 @@ export const cellModelParamsFKGP = {
         w : 1,
         vm : -85,
         t : 0,
-        divG_gradV: 0,
     },
     constants:{
         Cm : 1,           //units uF/cm2
@@ -92,7 +90,6 @@ export const cellModelParamsFKMBR = {
         w : 1,
         vm : -85,
         t : 0,
-        divG_gradV: 0,
     },
     constants:{
         Cm : 1,           //units uF/cm2
@@ -133,7 +130,6 @@ export const cellModelParamsFKMLR1 = {
         w : 1,
         vm : -85,
         t : 0,
-        divG_gradV: 0,
     },
     constants:{
         Cm : 1,           //units uF/cm2

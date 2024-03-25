@@ -28,7 +28,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     
     const integ = {
         simulate: true,
-        dt : 0.01,     //[ms]
+        dt : 0.02,     //[ms]
         dx : 100,     //Mesh edglength [um] 
         simulation_time : 0,
     }
@@ -51,8 +51,6 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfVertices);
     const voiInitValues    = new Float32Array(numberOfVertices);
     voiInitValues.fill(cellObj.states.vm)
-    const voiInitValuesQuantized = new Int32Array(numberOfVertices);
-    voiInitValuesQuantized.fill(cellObj.states.vm * 32768);
 
     const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices)
     const constantsArray    = new Float32Array(Object.values(cellObj.constants))
@@ -64,10 +62,6 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     const statesBuffer = device.createBuffer({
         size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-    const quantizedVmBuffer = device.createBuffer({
-        size: Int32Array.BYTES_PER_ELEMENT * numberOfVertices,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
     const constantsBuffer = device.createBuffer({
@@ -260,21 +254,13 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                 {
                     binding: 3,
                     resource: {
-                        buffer: quantizedVmBuffer,
-                        offset: 0,
-                        size: Int32Array.BYTES_PER_ELEMENT * numberOfVertices,
-                    },
-                },
-                {
-                    binding: 4,
-                    resource: {
                         buffer: constantsBuffer,
                         offset: 0,
                         size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
                     },
                 },
                 {
-                    binding: 5,
+                    binding: 4,
                     resource: {
                         buffer: integBuffer,
                         offset: 0,
@@ -282,7 +268,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     },
                 },
                 {
-                    binding: 6,
+                    binding: 5,
                     resource: {
                         buffer: visualParamsBuffer,
                         offset: 0,
@@ -290,7 +276,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     },
                 },
                 // {
-                //     binding: 7,
+                //     binding: 6,
                 //     resource: {
                 //         buffer: resultMatrixBuffer,
                 //         offset: 0,
@@ -316,12 +302,6 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         statesBuffer,
         0,
         statesArray
-    );
-
-    device.queue.writeBuffer(
-        quantizedVmBuffer,
-        0,
-        voiInitValuesQuantized
     );
 
     //Draw function for updating data on canvas and triggering gpu updates
