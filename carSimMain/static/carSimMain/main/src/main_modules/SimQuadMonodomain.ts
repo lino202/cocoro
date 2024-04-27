@@ -2,14 +2,14 @@ import { createTransforms, createViewProjection, meshObj} from '../helpers/helpe
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
-import { computeShaderMonodomainSurf } from '../tissue_shaders/simSurfMonodomainShader.js';
+import { computeShaderMonodomainQuad } from '../tissue_shaders/simQuadMonodomainShader.js';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
 
 const createCamera =require('3d-view-controls')
 
-export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj) => {
+export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj) => {
     
     console.log("RENDERING AND SIMULATING SURFACE");
     console.log("SIMULATING CELL MODEL:");
@@ -25,7 +25,7 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     const integ = {
         simulate: true,
         dt : 0.02,     //[ms]
-        dx : 100,     //Mesh edglength [um] 
+        dx : meshData.dx,     //Mesh edglength [um] 
         simulation_time : 0,
     }
     const integFolder = gui.addFolder('Integration');
@@ -219,12 +219,12 @@ export const SimSurfMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     // });
 
-    console.log(computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices, workgroup_size))
+    console.log(computeShaderMonodomainQuad(cellObj.cellModel, numberOfVertices, workgroup_size))
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainSurf(cellObj.cellModel, numberOfVertices, workgroup_size),
+            code: computeShaderMonodomainQuad(cellObj.cellModel, numberOfVertices, workgroup_size),
           }),
           entryPoint: 'comp_monodomain_main',
         },

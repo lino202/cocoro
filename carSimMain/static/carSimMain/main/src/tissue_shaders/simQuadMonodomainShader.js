@@ -2,7 +2,7 @@ import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shad
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
 import { get2DSecondDerivatives } from './get2DSecondDerivatives.js';
 
-export function computeShaderMonodomainSurf(cellModel, nNodes, workgroup_size){
+export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size){
 
     var specificDefinitions;
     var specificComputeCore;

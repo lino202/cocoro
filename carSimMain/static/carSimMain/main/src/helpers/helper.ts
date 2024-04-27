@@ -9,7 +9,9 @@ export interface meshObj {
     elementType: string,
     stim_params: Float32Array,
     connections: Uint32Array,
-    fibers_long: Float32Array
+    fibers_long: Float32Array,
+    render_points_global_ids: Uint32Array,
+    dx: number
 }
 
 

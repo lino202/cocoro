@@ -29,7 +29,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     const integ = {
         simulate: true,
         dt : 0.02,     //[ms]
-        dx : 100,     //Mesh edglength [um] 
+        dx : meshData.dx,     //Mesh edglength [um] 
         simulation_time : 0,
     }
     const integFolder = gui.addFolder('Integration');

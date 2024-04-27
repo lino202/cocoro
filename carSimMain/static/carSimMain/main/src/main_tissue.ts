@@ -1,5 +1,5 @@
 import { SimLineMonodomain} from './main_modules/simLineMonodomain';
-import { SimSurfMonodomain} from './main_modules/simSurfMonodomain';
+import { SimQuadMonodomain} from './main_modules/SimQuadMonodomain';
 import { checkWebGPU, meshObj } from './helpers/helper';
 import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
@@ -26,6 +26,7 @@ async function getMeshData() {
     // we use the parser https://github.com/ewfian/pickleparser
     // For now chrome is passing the request to http://localhost:8000/media/ without cors or cors-django-headers
     // which is fine for development but there will need to review this if one day we arrive to prod or public availability of the app/webpage
+    // If you are on 127.0.0.1: or similar in the browser you'll get the CORS error
     const fileSelector = document.getElementById('selectMeshOptions') as HTMLSelectElement;
     const meshURL: string = 'http://localhost:8000/media/' + fileSelector.value + '.pickle'
     console.log('Mesh URL:', meshURL);
@@ -37,12 +38,13 @@ async function getMeshData() {
     const byteArray = new Uint8Array(arrayBuffer);
     var meshData:meshObj = parser.parse(byteArray);
 
-    meshData.vertexs      = new Float32Array(meshData.vertexs)
-    meshData.render_elems = new Uint32Array(meshData.render_elems)
-    meshData.normals      = new Float32Array(meshData.normals);
-    meshData.stim_params  = new Float32Array(meshData.stim_params);
-    meshData.connections  = new Uint32Array(meshData.connections);
-    meshData.fibers_long  = new Float32Array(meshData.fibers_long);
+    meshData.vertexs                   = new Float32Array(meshData.vertexs)
+    meshData.render_elems              = new Uint32Array(meshData.render_elems)
+    meshData.normals                   = new Float32Array(meshData.normals);
+    meshData.stim_params               = new Float32Array(meshData.stim_params);
+    meshData.connections               = new Uint32Array(meshData.connections);
+    meshData.render_points_global_ids  = new Uint32Array(meshData.render_points_global_ids);
+    meshData.fibers_long               = new Float32Array(meshData.fibers_long);
 
     return meshData;    
 
@@ -73,7 +75,7 @@ $(document).ready(function(){
 
 
 
-Notes:
+// Notes:
 // For finite differences we avoided operator splitting as this yielded a more compliant code that could be run in a compute shader
 // and reduce/erase the data-run problems due to several threads accesses to the same variable.
 
@@ -93,11 +95,16 @@ $('#btn-simulate').on('click', async ()=>{
     const meshData:meshObj = await getMeshData();
     const cellObj:cellObj  = await manageDataFromGUI(gui, "Tissue");
 
-    if (meshData.elementType == "triangle"){
-        console.log("Surface Monodomain Simulation")
-        SimSurfMonodomain(gui, meshData, cellObj);
-    }else if (meshData.elementType == "line") {
+    if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
         SimLineMonodomain(gui, meshData, cellObj)
+    }else if (meshData.elementType == "quad"){
+        console.log("Quad Monodomain Simulation")
+        SimQuadMonodomain(gui, meshData, cellObj);
+    }else if (meshData.elementType == "hexa") {
+        console.log("Hexa Monodomain Simulation")
+        // SimHexaMonodomain(gui, meshData, cellObj)
+    }else{
+        console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }
 });
