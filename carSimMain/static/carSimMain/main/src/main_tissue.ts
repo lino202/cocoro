@@ -1,12 +1,16 @@
 import { SimLineMonodomain} from './main_modules/simLineMonodomain';
 import { SimQuadMonodomain} from './main_modules/SimQuadMonodomain';
+import { SimHexaMonodomain} from './main_modules/SimHexaMonodomain';
 import { checkWebGPU, meshObj } from './helpers/helper';
+import { LightInputsInterface } from './helpers/mysettings';
 import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
 import { GUI } from 'dat.gui';
 import { Parser } from 'pickleparser'
 
 //  Global Variables ------------
+let li:LightInputsInterface = {};
+
 const visualParams = {
     voiMax   : 60,
     voiMin   : -100,
@@ -62,8 +66,10 @@ $(document).ready(function(){
 });
 
 // MAIN TODOs in order:
-// TODO add 3D
-// TODO add different resolutions dx
+// TODO RangeError: Invalid Array Length for the huge mesh, maybe is due to big amount of numbers in the arrays!
+// TODO stim params should be define as node sets to reduce array lengths, now uses nNodesx4
+// TODO mesh vertexs are normalized with min and max per axis which distorts the goemetry in the rendering so maybe use absolute max and min value for rendering
+// TODO check implementations of double derivatives specially cross ones with neumann condition
 // TODO add AP plot
 // TODO add pECGs
 // TODO Rewrite all in OOP (and names and labels to webgpu instances for error handling)
@@ -91,7 +97,6 @@ $(document).ready(function(){
 
 $('#btn-simulate').on('click', async ()=>{
 
-    // const meshData:meshObj = getDataFromDjango(djangodata);
     const meshData:meshObj = await getMeshData();
     const cellObj:cellObj  = await manageDataFromGUI(gui, "Tissue");
 
@@ -103,7 +108,7 @@ $('#btn-simulate').on('click', async ()=>{
         SimQuadMonodomain(gui, meshData, cellObj);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
-        // SimHexaMonodomain(gui, meshData, cellObj)
+        SimHexaMonodomain(gui, meshData, cellObj, li)
     }else{
         console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }

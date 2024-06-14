@@ -90,7 +90,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         layout: 'auto',
         vertex: {
             module: device.createShaderModule({                    
-                code: commonVertFragShaders
+                code:  commonVertFragShaders(meshData.elementType)
             }),
             entryPoint: "vs_main",
             buffers:[
@@ -131,7 +131,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         },
         fragment: {
             module: device.createShaderModule({                    
-                code: commonVertFragShaders
+                code:  commonVertFragShaders(meshData.elementType)
             }),
             entryPoint: "fs_main",
             targets: [

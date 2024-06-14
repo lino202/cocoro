@@ -1,23 +1,33 @@
 import { createTransforms, createViewProjection, meshObj} from '../helpers/helper';
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
+import { LightInputsInterface } from '../helpers/mysettings';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
-import { computeShaderMonodomainQuad } from '../tissue_shaders/simQuadMonodomainShader.js';
+import { computeShaderMonodomainHexa } from '../tissue_shaders/simHexaMonodomainShader.js';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
 
 const createCamera =require('3d-view-controls')
 
-export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj) => {
+export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj, li:LightInputsInterface) => {
     
-    console.log("RENDERING AND SIMULATING SURFACE");
+    console.log("RENDERING AND SIMULATING HEXA");
     console.log("SIMULATING CELL MODEL:");
     console.log(cellObj.cellModel)
     
     var stats = new Stats();
     stats.dom.style.cssText = 'position:fixed;bottom:0;right:0;cursor:pointer;opacity:0.9;z-index:10000';
     document.body.appendChild( stats.dom );
+
+    // define default input values: TODO maybe define this in helper/mysettings
+    li.color = li.color == undefined ? '0.0, 1.0, 0.0' : li.color;
+    li.ambientIntensity = li.ambientIntensity == undefined ? '0.2' : li.ambientIntensity;
+    li.diffuseIntensity = li.diffuseIntensity == undefined ? '0.8' : li.diffuseIntensity;
+    li.specularIntensity = li.specularIntensity == undefined ? '0.2' : li.specularIntensity;
+    li.shininess = li.shininess == undefined ? '30.0' : li.shininess;
+    li.specularColor = li.specularColor == undefined ? '1.0, 1.0, 1.0' : li.specularColor;
+    li.isTwoSideLighting = li.isTwoSideLighting == undefined ? '1.0' : li.isTwoSideLighting;
 
     const gpu = await initGPU();
     const device = gpu.device;
@@ -42,12 +52,14 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     // create arrays and buffers
     const numberOfIndexes  = meshData.render_elems.length;
-    const numberOfVertices = Math.trunc(meshData.vertexs.length / 3);
-    const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfVertices);
+    const numberOfVertices = Math.trunc(meshData.vertexs.length / 3); // vertexs are only the surface one in Hex
+    const numberOfPoints   = Math.trunc(meshData.fibers_long.length / 3); // vertexs are only the surface one in Hex
+    const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfPoints);
     const voiInitValues    = new Float32Array(numberOfVertices);
     voiInitValues.fill(cellObj.states.vm)
+    // voiInitValues.fill(0.9)
 
-    const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices);
+    const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfPoints);
     const constantsArray    = new Float32Array(Object.values(cellObj.constants));
     const integrationArray  = new Float32Array([integ.dt, integ.dx]);
     const visualParamsArray = new Float32Array([gui.__folders.Visualization.__controllers[0].getValue(), 
@@ -56,6 +68,7 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     );
     const fiberOrientationArray = new Float32Array(Object.values(meshData.fibers_long));
     const connectionsArray      = new Uint32Array(Object.values(meshData.connections));
+    const renderPointsArray     = new Uint32Array(Object.values(meshData.render_points_global_ids));
 
     const statesBuffer = device.createBuffer({
         size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
@@ -67,6 +80,10 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     });
     const connectionsBuffer = device.createBuffer({
         size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+    });
+    const renderPointsBuffer = device.createBuffer({
+        size: Uint32Array.BYTES_PER_ELEMENT * renderPointsArray.length,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
     });
     const constantsBuffer = device.createBuffer({
@@ -82,6 +99,27 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
 
+    const vertexRenderBuffer = device.createBuffer({
+        size: 192,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    const fragmentUniformBuffer = device.createBuffer({
+        size: 32,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    const colorUniformBuffer = device.createBuffer({    //buffer of 32 bytes with 16 for light color vector and the rest 16 bytes for specular color 
+        size: 32,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    const lightUniformBuffer = device.createBuffer({    
+        size: 20,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+
 
     // TODO Read the tojiro post and determine which one of the two buffer creations (up or bottom) is better for us
 
@@ -96,7 +134,7 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         layout: 'auto',
         vertex: {
             module: device.createShaderModule({                    
-                code: commonVertFragShaders(meshData.elementType)
+                code:  commonVertFragShaders(meshData.elementType)
             }),
             entryPoint: "vs_main",
             buffers:[
@@ -168,11 +206,22 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     // add rotation and camera:
     let rotation = vec3.fromValues(0, 0, 0);       
     var camera = createCamera(gpu.canvas, vp.cameraOption);
+    let eyePosition = new Float32Array(vp.cameraOption.eye);
+    let lightPosition = eyePosition;
 
-    const vertexRenderBuffer = device.createBuffer({
-        size: 192,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-    });
+    device.queue.writeBuffer(colorUniformBuffer, 0, new Float32Array(li.color?.split(',').map(Number)!));
+    device.queue.writeBuffer(colorUniformBuffer, 16, new Float32Array(li.specularColor?.split(',').map(Number)!));
+
+    // get realiable light parameters and associated with the correct buffer and passed to the device
+    const lightParams = new Float32Array([
+        parseFloat(li.ambientIntensity?.toString()!),
+        parseFloat(li.diffuseIntensity?.toString()!),
+        parseFloat(li.specularIntensity?.toString()!),
+        parseFloat(li.shininess?.toString()!),
+        parseFloat(li.isTwoSideLighting?.toString()!),
+    ]);
+    device.queue.writeBuffer(lightUniformBuffer, 0, lightParams);
+
 
     const renderBindGroup = device.createBindGroup({
         layout: renderPipeline.getBindGroupLayout(0),
@@ -184,7 +233,31 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     offset: 0,
                     size: 192
                 }
-            }        
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: fragmentUniformBuffer,
+                    offset: 0,
+                    size: 32
+                }
+            },
+            {
+                binding: 2,
+                resource: {
+                    buffer: colorUniformBuffer,
+                    offset: 0,
+                    size: 32
+                }
+            },
+            {
+                binding: 3,
+                resource: {
+                    buffer: lightUniformBuffer,
+                    offset: 0,
+                    size: 20
+                }
+            }    
         ]
     });
 
@@ -212,19 +285,19 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     // COMPUTE PIPELINE ---------------------------------------------------
 
-    // // Result Matrix
-    // const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * numberOfVertices;
+    // Result Matrix
+    // const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * numberOfPoints;
     // const resultMatrixBuffer = device.createBuffer({
     //     size: resultMatrixBufferSize,
     //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
     // });
 
-    console.log(computeShaderMonodomainQuad(cellObj.cellModel, numberOfVertices, workgroup_size))
+    console.log(computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, workgroup_size))
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainQuad(cellObj.cellModel, numberOfVertices, workgroup_size),
+            code: computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, workgroup_size),
           }),
           entryPoint: 'comp_monodomain_main',
         },
@@ -246,7 +319,7 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                     resource: {
                         buffer: stimBuffer,
                         offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices * stimParamsNum,
+                        size: Float32Array.BYTES_PER_ELEMENT * numberOfPoints * stimParamsNum,
                     },
                 },
                 {
@@ -297,9 +370,17 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
                         size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
                     },
                 },
+                {
+                    binding: 8,
+                    resource: {
+                        buffer: renderPointsBuffer,
+                        offset: 0,
+                        size: Uint32Array.BYTES_PER_ELEMENT * renderPointsArray.length,
+                    },
+                },
 
                 // {
-                //     binding: 8,
+                //     binding: 9,
                 //     resource: {
                 //         buffer: resultMatrixBuffer,
                 //         offset: 0,
@@ -339,6 +420,13 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         connectionsArray
     );
 
+
+    device.queue.writeBuffer(
+        renderPointsBuffer,
+        0,
+        renderPointsArray
+    );
+
     //Draw function for updating data on canvas and triggering gpu updates
     var startTime = performance.now();
     function draw() {
@@ -374,7 +462,12 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             const pMatrix = vp.projectionMatrix;
             vMatrix = camera.matrix;
             mat4.multiply(vpMatrix, pMatrix, vMatrix);
+
+            eyePosition = new Float32Array(camera.eye.flat());
+            lightPosition = eyePosition;
             device.queue.writeBuffer(vertexRenderBuffer, 0, vpMatrix as ArrayBuffer);
+            device.queue.writeBuffer(fragmentUniformBuffer, 0, eyePosition);
+            device.queue.writeBuffer(fragmentUniformBuffer, 16, lightPosition);
         
             createTransforms(modelMatrix,[0,0,0], rotation);
             mat4.invert(normalMatrix, modelMatrix);
@@ -390,7 +483,7 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(computePipeline);
             passEncoder.setBindGroup(0, computeBindGroup);
-            passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices/workgroup_size));
+            passEncoder.dispatchWorkgroups(Math.ceil(numberOfPoints/workgroup_size));
             passEncoder.end();
         }
         {   //Render Update

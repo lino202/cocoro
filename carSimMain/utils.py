@@ -286,9 +286,10 @@ def parseMesh(binaryData):
         render_points_global_ids = np.array([-1,-1])
     elif mesh.GetMaxCellSize()==8: 
         elementType = 'hexa'
-        render_points_global_ids = numpy_support.vtk_to_numpy(renderMesh.GetPointData().GetArray("ids"))
+        tmp_render_points_global_ids = numpy_support.vtk_to_numpy(renderMesh.GetPointData().GetArray("ids"))
+        render_points_global_ids = np.ones(mesh.GetNumberOfPoints()).astype(int) * mesh.GetNumberOfPoints()
+        render_points_global_ids[tmp_render_points_global_ids] = np.arange(tmp_render_points_global_ids.shape[0])
 
-    
     #Compute normals
     if mesh.GetMaxCellSize()==2:
         # Suppose a normal

@@ -1,12 +1,12 @@
 import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shaders/fenton_karma_wgsl.js'
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
-import { get2DSecondDerivatives } from './get2DSecondDerivatives.js';
+import { getSecondDerivativesQuad } from './getSecondDerivativesQuad.js';
 
 export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size){
 
     var specificDefinitions;
     var specificComputeCore;
-    var secondDerivativesShader = get2DSecondDerivatives(nNodes);
+    var secondDerivativesShader = getSecondDerivativesQuad(nNodes);
     if (cellModel == 'Fenton_Karma'){
         specificDefinitions = fentonKarmaDefinitions;
         specificComputeCore = fentonKarmaCoreCompute('Tissue');
@@ -45,14 +45,14 @@ export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size){
         };
 
         struct Connections {
-            i_j1: u32,
-            i1_j1: u32,
-            i1_j: u32,
-            i1_jminus1: u32,
-            i_jminus1: u32,
-            iminus1_jminus1: u32,
-            iminus1_j: u32,
-            iminus1_j1: u32
+            _i_j1  :  u32,
+            _i1_j1 :  u32,
+            _i1_j  :  u32,
+            _i1_1j :  u32,
+            _i_1j  :  u32,
+            _1i_1j :  u32,
+            _1i_j  :  u32,
+            _1i_j1 :  u32
         };
 
         ${specificDefinitions}
@@ -86,14 +86,14 @@ export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size){
             var sigma_yy:f32 = (pow(fibers_orient[idx].long_y,2) * constants.sigma_long) + (pow(fibers_orient[idx].long_x,2) * sigma_trans);
 
             // Compute the divergence of the Vm gradient 
-            let i_j1            : u32 = connections[idx].i_j1;           
-            let i1_j1           : u32 = connections[idx].i1_j1;         
-            let i1_j            : u32 = connections[idx].i1_j;         
-            let i1_jminus1      : u32 = connections[idx].i1_jminus1;     
-            let i_jminus1       : u32 = connections[idx].i_jminus1;      
-            let iminus1_jminus1 : u32 = connections[idx].iminus1_jminus1;
-            let iminus1_j       : u32 = connections[idx].iminus1_j;      
-            let iminus1_j1      : u32 = connections[idx].iminus1_j1; 
+            let _i_j1  : u32 = connections[idx]._i_j1;           
+            let _i1_j1 : u32 = connections[idx]._i1_j1;         
+            let _i1_j  : u32 = connections[idx]._i1_j;         
+            let _i1_1j : u32 = connections[idx]._i1_1j;     
+            let _i_1j  : u32 = connections[idx]._i_1j;      
+            let _1i_1j : u32 = connections[idx]._1i_1j;
+            let _1i_j  : u32 = connections[idx]._1i_j;      
+            let _1i_j1 : u32 = connections[idx]._1i_j1; 
             var d2dxdx_V:f32 = 0.0;
             var d2dydy_V:f32 = 0.0;    
             var d2dxdy_V:f32 = 0.0;
