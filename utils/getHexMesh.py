@@ -64,27 +64,27 @@ def main():
     newElems      = newPointsIdxs[inverseUsedIdxs]
     newElems      = newElems.reshape((-1,8)) 
 
-    #Now we can get the node connections, ordeing like this nPointsx6 [i,:] = [i-,i+,j-,j+,k-,k+]
-    tree = KDTree(newPoints)    
-    idx_neighbours = tree.query_ball_point(newPoints, 1.1)
+    # #Now we can get the node connections, ordeing like this nPointsx6 [i,:] = [i-,i+,j-,j+,k-,k+]
+    # tree = KDTree(newPoints)    
+    # idx_neighbours = tree.query_ball_point(newPoints, 1.1)
  
-    nodeConnections = np.ones((newPointsIdxs.shape[0],6), dtype=int) * -1 #if I use nan we'll have to switch to float -> more memory
-    idxMap = np.array([np.nan,np.nan,0,np.nan,1,2,np.nan,3,4,np.nan,5])
-    for idx, point_idx in enumerate(tqdm(idx_neighbours)):
-        point_idx.remove(idx)
-        currentDiff = newPoints[point_idx] - newPoints[idx]
-        axisDir  = (currentDiff!=0).nonzero()[1]
-        axisSign = np.sum(currentDiff, axis=1)
-        encodedIdx = ((axisDir + 1) * 3) + axisSign
-        nodeConnections[idx,idxMap[encodedIdx].astype(int)] = point_idx
+    # nodeConnections = np.ones((newPointsIdxs.shape[0],6), dtype=int) * -1 #if I use nan we'll have to switch to float -> more memory
+    # idxMap = np.array([np.nan,np.nan,0,np.nan,1,2,np.nan,3,4,np.nan,5])
+    # for idx, point_idx in enumerate(tqdm(idx_neighbours)):
+    #     point_idx.remove(idx)
+    #     currentDiff = newPoints[point_idx] - newPoints[idx]
+    #     axisDir  = (currentDiff!=0).nonzero()[1]
+    #     axisSign = np.sum(currentDiff, axis=1)
+    #     encodedIdx = ((axisDir + 1) * 3) + axisSign
+    #     nodeConnections[idx,idxMap[encodedIdx].astype(int)] = point_idx
 
-    with open(os.path.join(args.outPath, 'nodeConnections.pickle'), 'wb') as handle:
-        pickle.dump(nodeConnections, handle)
+    # with open(os.path.join(args.outPath, 'nodeConnections.pickle'), 'wb') as handle:
+    #     pickle.dump(nodeConnections, handle)
     
     #We know put the correct spatial coordinates x,y,z if the voxel space was in mm (as common) the results is in mm
     newPoints = np.concatenate((newPoints, np.ones((newPoints.shape[0],1), dtype=int)), axis=1)
     newPoints = np.matmul(newPoints, affine)
-    newPoints = newPoints[:,:3]
+    newPoints = newPoints[:,:3] * 1000 #pass to um
 
     cells = [("hexahedron", newElems)]
     mesh = meshio.Mesh(newPoints, cells=cells)

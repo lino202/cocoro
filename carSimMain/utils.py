@@ -259,11 +259,14 @@ def parseMesh(binaryData):
     dx = np.max(np.abs(np.round(vertexs[0,:]).astype(int) - np.round(vertexs[1,:]).astype(int)))
 
     # Scale for rendering
-    minCoords = np.min(vertexs, axis=0)
-    maxCoords = np.max(vertexs, axis=0)
-    vertexs = (vertexs - minCoords)
-    norm = maxCoords - minCoords
-    vertexs = np.divide(vertexs, norm, where=norm>1e-5)
+    # minCoords = np.min(vertexs, axis=0)
+    # maxCoords = np.max(vertexs, axis=0)
+    # vertexs = (vertexs - minCoords)
+    # norm = maxCoords - minCoords
+    # vertexs = np.divide(vertexs, norm, where=norm>1e-5)
+
+       
+    vertexs = (vertexs - vertexs.min()) / (vertexs.max() - vertexs.min())
     vertexs = (vertexs * 2) - 1
     
     #Get render elems (triangles or lines)

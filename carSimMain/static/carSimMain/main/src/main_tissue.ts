@@ -66,9 +66,8 @@ $(document).ready(function(){
 });
 
 // MAIN TODOs in order:
-// TODO RangeError: Invalid Array Length for the huge mesh, maybe is due to big amount of numbers in the arrays!
+// TODO RangeError: Invalid Array Length for the huge mesh, maybe is due to big amount of numbers in the arrays, that's indeed the reason with a hex mesh of 1.3M it works!
 // TODO stim params should be define as node sets to reduce array lengths, now uses nNodesx4
-// TODO mesh vertexs are normalized with min and max per axis which distorts the goemetry in the rendering so maybe use absolute max and min value for rendering
 // TODO check implementations of double derivatives specially cross ones with neumann condition
 // TODO add AP plot
 // TODO add pECGs
@@ -102,10 +101,10 @@ $('#btn-simulate').on('click', async ()=>{
 
     if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
-        SimLineMonodomain(gui, meshData, cellObj)
+        // SimLineMonodomain(gui, meshData, cellObj)
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
-        SimQuadMonodomain(gui, meshData, cellObj);
+        // SimQuadMonodomain(gui, meshData, cellObj);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
         SimHexaMonodomain(gui, meshData, cellObj, li)
