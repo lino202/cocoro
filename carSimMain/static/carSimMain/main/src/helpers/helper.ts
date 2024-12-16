@@ -122,8 +122,8 @@ export const initGPU = async () => {
 
     const adapterLimits = adapter.limits
     console.log(adapterLimits);
-    const adapterInfo = await adapter.requestAdapterInfo() as GPUAdapterInfo;
-    console.log(adapterInfo);
+    // console.log(adapter.features);
+    console.log(adapter.info);
 
     // Request highest limit
     const device = await adapter.requestDevice({

@@ -6,5 +6,4 @@ dependencies:
   - python
   - django
   - meshio
-  - typescript
 prefix: C:\Users\usuario\anaconda3\envs\carsim

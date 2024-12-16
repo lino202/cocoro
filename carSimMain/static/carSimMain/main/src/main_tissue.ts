@@ -66,13 +66,15 @@ $(document).ready(function(){
 });
 
 // MAIN TODOs in order:
+// Make three pages one is done is the simple canvas, another with two canvas where you can put or the pECG or the AP plot and another with 3 canvas for the three options sim, AP y pECG
+// Calculate things on the gpu specially for the relations for cumputing the FD as this speeds up things and make the .pickle to save and load smaller
 // TODO RangeError: Invalid Array Length for the huge mesh, maybe is due to big amount of numbers in the arrays, that's indeed the reason with a hex mesh of 1.3M it works!
 // TODO stim params should be define as node sets to reduce array lengths, now uses nNodesx4
 // TODO check implementations of double derivatives specially cross ones with neumann condition
 // TODO add AP plot
 // TODO add pECGs
-// TODO Rewrite all in OOP (and names and labels to webgpu instances for error handling)
-// TODO add FEM (search for FEM in the project) see continuos and discontinous (might be better for GPU) Galerkin methods
+// TODO Rewrite all in OOP (and names and labels to webgpu instances for error handling) THIS SHOULD BE DONE SLOWLY AS WEE ADD NEW TODOS
+// TODO add FEM (search for FEM in the project) see continuos and discontinous (might be better for GPU) Galerkin methods, checked far field form Niccolo and Fenton
 // TODO add CS
 // TODO show stim regions on gui and made available the modification of those parameters
 // TODO stim with click
@@ -101,10 +103,10 @@ $('#btn-simulate').on('click', async ()=>{
 
     if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
-        // SimLineMonodomain(gui, meshData, cellObj)
+        SimLineMonodomain(gui, meshData, cellObj)
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
-        // SimQuadMonodomain(gui, meshData, cellObj);
+        SimQuadMonodomain(gui, meshData, cellObj);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
         SimHexaMonodomain(gui, meshData, cellObj, li)
