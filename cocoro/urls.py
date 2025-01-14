@@ -1,4 +1,4 @@
-"""carSim URL Configuration
+"""cocoro URL Configuration
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/3.1/topics/http/urls/
@@ -19,7 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('', include('carSimMain.urls')),  #This adds all views/urls for that app carSimMain
+    path('', include('cocoroMain.urls')),  #This adds all views/urls for that app cocoroMain
     path('admin/', admin.site.urls),
 ]
 

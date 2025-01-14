@@ -1,4 +1,4 @@
-name: carsim
+name: cocoro
 channels:
   - defaults
 dependencies:
@@ -6,4 +6,4 @@ dependencies:
   - python
   - django
   - meshio
-prefix: C:\Users\usuario\anaconda3\envs\carsim
+prefix: C:\Users\usuario\anaconda3\envs\cocoro

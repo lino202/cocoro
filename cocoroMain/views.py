@@ -12,12 +12,12 @@ def tissue(request):
     # Retrieve data from the database
     files = os.listdir(settings.MEDIA_ROOT)
     files = [file.split('.')[0] for file in files if ".pickle" in file]
-    return render(request, 'carSimMain/tissue.html', {'files': files})
+    return render(request, 'cocoroMain/tissue.html', {'files': files})
 
 # Cellular view.
 # Here we can run cellular simulations and plots
 def cellular(request):
-    return render(request, 'carSimMain/cellular.html')
+    return render(request, 'cocoroMain/cellular.html')
 
 
 # Here we upload the mesh and parse its information and save in database
@@ -48,4 +48,4 @@ def upload(request):
         form = UploadMeshForm()
 
 
-    return render(request, 'carSimMain/upload.html', {'form': form})
+    return render(request, 'cocoroMain/upload.html', {'form': form})

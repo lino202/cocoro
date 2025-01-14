@@ -1,4 +1,4 @@
-# CarSim
+# Cocoro
 
 Simulations in the GPU throught the web.
 
@@ -11,9 +11,9 @@ For now it is working in chrome on windows only and in my case I have to set msi
 
    ```sh
    cd /parent/folder
-   git clone https://github.com/lino202/carSim
-   cd carSim
-   cd carSimMain/static/carSimMain/main/
+   git clone https://github.com/lino202/cocoro
+   cd cocoro
+   cd cocoroMain/static/cocoroMain/main/
    npm install
    npm run prod
    ```
@@ -21,7 +21,7 @@ For now it is working in chrome on windows only and in my case I have to set msi
 ## Load server
 
    ```sh
-   cd /path/carSim
+   cd /path/cocoro
    python manage.py runserver 
    ```
 
@@ -35,7 +35,7 @@ The core of the software is written in Typescript. These code calls the shaders 
 Go to where the webpack and package.json are which define how the compilation happens for ts files
 
    ```sh
-   cd /path/carSim/carSimMain/static/carSimMain/main/src/
+   cd /path/cocoro/cocoroMain/static/cocoroMain/main/src/
    npm run prod
    ```
 
