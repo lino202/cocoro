@@ -4,13 +4,16 @@ import { LightInputsInterface } from '../helpers/mysettings';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
 import { computeShaderMonodomainHexa } from '../tissue_shaders/simHexaMonodomainShader.js';
+import EnsightWriter from '../io/ensightWriter';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
 
 const createCamera =require('3d-view-controls')
 
-export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj, li:LightInputsInterface) => {
+
+// Pay attention that vertexs are for the render mesh and actual_points are for the actual mesh (in quad and line these are equal)
+export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj, li:LightInputsInterface, ensightWriter:EnsightWriter|undefined) => {
     
     console.log("RENDERING AND SIMULATING HEXA");
     console.log("SIMULATING CELL MODEL:");
@@ -47,8 +50,18 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         } 
     });
 
+    // Get the values from the GUI 
     var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
     var workgroup_size = gui.__folders.gpuSettings.__controllers[0].getValue();
+    // For now saving and debugging are constrainly defined before setting the sim 
+    // as the compute shader should already have the defined buffers and so on
+    // so it seems this will be it
+    var saveStart = gui.__folders.Save.__controllers[0].getValue();
+    var saveEnd = gui.__folders.Save.__controllers[1].getValue();
+    var saveName = gui.__folders.Save.__controllers[2].getValue();
+    var debugStart = gui.__folders.Debug.__controllers[0].getValue();
+    var debugEnd = gui.__folders.Debug.__controllers[1].getValue();
+    var debugStateName = gui.__folders.Debug.__controllers[2].getValue();
 
     // create arrays and buffers
     const numberOfIndexes  = meshData.render_elems.length;
@@ -57,7 +70,6 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfPoints);
     const voiInitValues    = new Float32Array(numberOfVertices);
     voiInitValues.fill(cellObj.states.vm)
-    // voiInitValues.fill(0.9)
 
     const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfPoints);
     const constantsArray    = new Float32Array(Object.values(cellObj.constants));
@@ -284,20 +296,148 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     };
 
     // COMPUTE PIPELINE ---------------------------------------------------
+    const computeBindGroupEntries = [
+        {
+            binding: 0,
+            resource: {
+                buffer: voiBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices,
+            },
+        },
+        {
+            binding: 1,
+            resource: {
+                buffer: stimBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * numberOfPoints * stimParamsNum,
+            },
+        },
+        {
+            binding: 2,
+            resource: {
+                buffer: statesBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
+            },
+        },
+        {
+            binding: 3,
+            resource: {
+                buffer: fiberOrientationBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * fiberOrientationArray.length,
+            },
+        },
+        {
+            binding: 4,
+            resource: {
+                buffer: connectionsBuffer,
+                offset: 0,
+                size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
+            },
+        },
+        {
+            binding: 5,
+            resource: {
+                buffer: constantsBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
+            },
+        },
+        {
+            binding: 6,
+            resource: {
+                buffer: integBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * integrationArray.length,
+            },
+        },
+        {
+            binding: 7,
+            resource: {
+                buffer: visualParamsBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+            },
+        },
+        {
+            binding: 8,
+            resource: {
+                buffer: renderPointsBuffer,
+                offset: 0,
+                size: Uint32Array.BYTES_PER_ELEMENT * renderPointsArray.length,
+            },
+        },
+        
+    ];
 
-    // Result Matrix
-    // const resultMatrixBufferSize = Float32Array.BYTES_PER_ELEMENT * numberOfPoints;
-    // const resultMatrixBuffer = device.createBuffer({
-    //     size: resultMatrixBufferSize,
-    //     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
-    // });
 
-    console.log(computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, workgroup_size))
+    // Save buffer for results
+    const nodeResultsSize = Float32Array.BYTES_PER_ELEMENT * numberOfPoints;
+    let saveBuffer: GPUBuffer;
+    let readSaveBuffer: GPUBuffer;
+    let savedSimulation:boolean = false;
+    let totalStepsToSave:number = 0;
+    let stepsCount:number = 0;
+    if (saveStart >= 0) {
+        saveBuffer = device.createBuffer({
+            size: nodeResultsSize,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+        });
+        computeBindGroupEntries.push({
+            binding: 9,
+            resource: {
+                buffer: saveBuffer,
+                offset: 0,
+                size: nodeResultsSize,
+            },
+        });
+
+        totalStepsToSave = Math.floor((saveEnd - saveStart) / plot_dt) + 1;
+    }
+
+    // Debug buffer for debugging a state variable
+    let debugBuffer: GPUBuffer;
+    let readDebugBuffer: GPUBuffer;
+    if (debugStart >= 0) {
+        if (!(debugStateName in cellObj.states)) {
+            throw new Error(`Debug state name "${debugStateName}" is not a valid state in cellObj.states`);
+        }
+
+        debugBuffer = device.createBuffer({
+            size: nodeResultsSize,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+        });
+
+        if (saveStart >= 0){
+            computeBindGroupEntries.push({
+                binding: 10,
+                resource: {
+                    buffer: debugBuffer,
+                    offset: 0,
+                    size: nodeResultsSize,
+                },
+            });
+        }else{
+            computeBindGroupEntries.push({
+                binding: 9,
+                resource: {
+                    buffer: debugBuffer,
+                    offset: 0,
+                    size: nodeResultsSize,
+                },
+            });
+        }
+    }
+    
+
+    console.log(computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, workgroup_size, saveStart, debugStart, debugStateName))
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, workgroup_size),
+            code: computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, workgroup_size, saveStart, debugStart, debugStateName),
           }),
           entryPoint: 'comp_monodomain_main',
         },
@@ -305,88 +445,7 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     const computeBindGroup = device.createBindGroup({
         layout: computePipeline.getBindGroupLayout(0),
-            entries: [
-                {
-                    binding: 0,
-                    resource: {
-                        buffer: voiBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices,
-                    },
-                },
-                {
-                    binding: 1,
-                    resource: {
-                        buffer: stimBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * numberOfPoints * stimParamsNum,
-                    },
-                },
-                {
-                    binding: 2,
-                    resource: {
-                        buffer: statesBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * statesArray.length,
-                    },
-                },
-                {
-                    binding: 3,
-                    resource: {
-                        buffer: fiberOrientationBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * fiberOrientationArray.length,
-                    },
-                },
-                {
-                    binding: 4,
-                    resource: {
-                        buffer: connectionsBuffer,
-                        offset: 0,
-                        size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
-                    },
-                },
-                {
-                    binding: 5,
-                    resource: {
-                        buffer: constantsBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * constantsArray.length,
-                    },
-                },
-                {
-                    binding: 6,
-                    resource: {
-                        buffer: integBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * integrationArray.length,
-                    },
-                },
-                {
-                    binding: 7,
-                    resource: {
-                        buffer: visualParamsBuffer,
-                        offset: 0,
-                        size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
-                    },
-                },
-                {
-                    binding: 8,
-                    resource: {
-                        buffer: renderPointsBuffer,
-                        offset: 0,
-                        size: Uint32Array.BYTES_PER_ELEMENT * renderPointsArray.length,
-                    },
-                },
-
-                // {
-                //     binding: 9,
-                //     resource: {
-                //         buffer: resultMatrixBuffer,
-                //         offset: 0,
-                //     },
-                // }
-            ],
+        entries: computeBindGroupEntries,
     });
 
 
@@ -428,16 +487,16 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     );
 
     //Draw function for updating data on canvas and triggering gpu updates
-    var startTime = performance.now();
-    function draw() {
+    // var startTime = performance.now();
+    async function draw() {
 
         stats.begin();
-        if ((integ.simulation_time % 100 < plot_dt) && (integ.simulation_time % 100 > 0)){
-            var stopTime = performance.now();
-            console.log("Simulation time for computing 100 ms");
-            console.log(stopTime - startTime);
-            startTime = performance.now();
-        }
+        // if ((integ.simulation_time % 100 < plot_dt) && (integ.simulation_time % 100 > 0)){
+        //     var stopTime = performance.now();
+        //     console.log("Simulation time for computing 100 ms");
+        //     console.log(stopTime - startTime);
+        //     startTime = performance.now();
+        // }
         
         //Update Params
         if (integ.simulate){integ.simulation_time += plot_dt;}
@@ -500,42 +559,67 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             passEncoder.drawIndexed(numberOfIndexes);
             passEncoder.end();
         }
-        device.queue.submit([commandEncoder.finish()]);
+        
+        // Save or debug - Copying buffer to buffer.
+        if (integ.simulation_time >= saveStart && stepsCount <= totalStepsToSave-1 && integ.simulate && ensightWriter != undefined) {
+            readSaveBuffer = device.createBuffer({
+                label: 'Read Save Buffer',
+                size: nodeResultsSize,
+                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+            });
+            commandEncoder.copyBufferToBuffer(saveBuffer, 0, readSaveBuffer, 0, nodeResultsSize);
+        }
+        if (integ.simulation_time >= debugStart && integ.simulation_time <= debugEnd && integ.simulate) {
+            readDebugBuffer = device.createBuffer({
+                label: 'Read Save Buffer',
+                size: nodeResultsSize,
+                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+            });
+            commandEncoder.copyBufferToBuffer(debugBuffer, 0, readDebugBuffer, 0, nodeResultsSize);
+        }
 
+        // Submit GPU commands.
+        const gpuCommands = commandEncoder.finish();
+        device.queue.submit([gpuCommands]);
+
+        // Save or debug - get from gpu
+        if (integ.simulation_time >= saveStart && stepsCount <= totalStepsToSave-1 && integ.simulate && ensightWriter != undefined) {
+            
+            // Get the data from the gpu
+            await readSaveBuffer.mapAsync(GPUMapMode.READ);
+            const arrayBuffer = readSaveBuffer.getMappedRange();
+
+            // Generate the wildcard string for the ensight file
+            const wildcardString = stepsCount.toString().padStart(totalStepsToSave.toString().length, '0');
+            
+            // Save dynamically
+            ensightWriter.saveStates(arrayBuffer, wildcardString);
+            
+            savedSimulation = true;
+            stepsCount++;
+        }
+        if (stepsCount > totalStepsToSave-1 && savedSimulation && ensightWriter != undefined) {
+            savedSimulation = false;
+            // Save geometry and case for ensight
+            ensightWriter.saveGeometry(meshData);
+            ensightWriter.saveAnimation(totalStepsToSave, plot_dt, saveStart);
+
+            console.log('Animation saved as: ', ensightWriter.animationFileName);
+            console.log('Geometry saved as: ', ensightWriter.geometryFileName);
+            console.log('States saved as: ', ensightWriter.statesFileName + '*.ens');
+        } 
+
+        if (integ.simulation_time >= debugStart && integ.simulation_time <= debugEnd && integ.simulate) {
+            await readDebugBuffer.mapAsync(GPUMapMode.READ);
+            const arrayBuffer = readDebugBuffer.getMappedRange();
+            console.log(integ.simulation_time)
+            console.log(new Float32Array(arrayBuffer));
+        }
+        
         stats.end();
 
-        requestAnimationFrame(draw)
+        requestAnimationFrame(draw);
 
-        // // RESULTS Get a GPU buffer for reading in an unmapped state.
-        // const gpuReadBuffer = device.createBuffer({
-        //     size: resultMatrixBufferSize,
-        //     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-        // });
-
-        // // Encode commands for copying buffer to buffer.
-        // commandEncoder.copyBufferToBuffer(
-        //     resultMatrixBuffer /* source buffer */,
-        //     0 /* source offset */,
-        //     gpuReadBuffer /* destination buffer */,
-        //     0 /* destination offset */,
-        //     resultMatrixBufferSize /* size */
-        // );
-
-        // // Submit GPU commands.
-        // const gpuCommands = commandEncoder.finish();
-        // device.queue.submit([gpuCommands]);
-
-        // stats.end();
-
-        // // Read buffer.
-        // await gpuReadBuffer.mapAsync(GPUMapMode.READ);
-        // const arrayBuffer = gpuReadBuffer.getMappedRange();
-        // // if ((integ.simulation_time > 80) && (integ.simulation_time < 120)) {
-        // console.log(new Float32Array(arrayBuffer));
-        // // }   
-        
-
-        // requestAnimationFrame(draw);
 
     }
 

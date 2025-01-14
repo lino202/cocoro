@@ -29,9 +29,9 @@ def upload(request):
         if form.is_valid():
             # PARSE
             uploadedFile = request.FILES['file']
-            vertexs, render_elems, normals, elementType, stim_params, connections, fibers_long, render_points_global_ids, dx = parseMesh(uploadedFile.read())
+            vertexs, actual_points, actual_elems, render_elems, normals, elementType, stim_params, connections, fibers_long, render_points_global_ids, dx = parseMesh(uploadedFile.read())
 
-            mesh_parsed = {'vertexs': vertexs, 'render_elems': render_elems, 'normals': normals, 'elementType': elementType, 
+            mesh_parsed = {'vertexs': vertexs, 'actual_points': actual_points, 'actual_elems': actual_elems, 'render_elems': render_elems, 'normals': normals, 'elementType': elementType, 
                            'stim_params': stim_params, 'connections': connections, 'fibers_long': fibers_long, 'dx': dx,
                            'render_points_global_ids': render_points_global_ids}
 

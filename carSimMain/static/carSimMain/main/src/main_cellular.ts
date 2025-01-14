@@ -16,6 +16,20 @@ const visualParams = {
 const gpuSettings = {
     workgroup_size   : 64,
 }
+
+const saveSettings = {
+    start   : -1,
+    end   : -1,
+    save_name: 'cell_sim',
+}
+
+const debugSettings = {
+    start   : -1,
+    end   : -1,
+    state_name : 'vm',
+}
+
+
 const gui = new GUI();
 
 
@@ -28,7 +42,7 @@ const gui = new GUI();
 
 $(document).ready(function(){
     console.log("WE ARE READY!!");
-    initGUI4UniqueCellModel(gui, gpuSettings, visualParams);
+    initGUI4UniqueCellModel(gui, gpuSettings, visualParams, 'Cellular', saveSettings, debugSettings);
 });
 
 $('#btn-simulate').on('click',()=>{

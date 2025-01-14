@@ -7,6 +7,8 @@ import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/m
 import $ from 'jquery';
 import { GUI } from 'dat.gui';
 import { Parser } from 'pickleparser'
+import EnsightWriter from './io/ensightWriter';
+
 
 //  Global Variables ------------
 let li:LightInputsInterface = {};
@@ -21,6 +23,19 @@ const visualParams = {
 const gpuSettings = {
     workgroup_size   : 64,
 }
+
+const saveSettings = {
+    start   : -1,
+    end   : -1,
+    save_name: 'tissue_sim'
+}
+
+const debugSettings = {
+    start   : -1,
+    end   : -1,
+    state_name : 'vm',
+}
+
 const gui = new GUI();
 
 // Functions -------------------
@@ -43,6 +58,8 @@ async function getMeshData() {
     var meshData:meshObj = parser.parse(byteArray);
 
     meshData.vertexs                   = new Float32Array(meshData.vertexs)
+    meshData.actual_points             = new Float32Array(meshData.actual_points)
+    meshData.actual_elems              = new Uint32Array(meshData.actual_elems)
     meshData.render_elems              = new Uint32Array(meshData.render_elems)
     meshData.normals                   = new Float32Array(meshData.normals);
     meshData.stim_params               = new Float32Array(meshData.stim_params);
@@ -62,7 +79,7 @@ async function getMeshData() {
 
 $(document).ready(function(){
     console.log("WE ARE READY!!");
-    initGUI4UniqueCellModel(gui, gpuSettings, visualParams, "Tissue");
+    initGUI4UniqueCellModel(gui, gpuSettings, visualParams, "Tissue", saveSettings, debugSettings);
 });
 
 // MAIN TODOs in order:
@@ -98,18 +115,29 @@ $(document).ready(function(){
 
 $('#btn-simulate').on('click', async ()=>{
 
+    // The first thing we do is to ask for the user to select a folder to save the ensight files in case save is activated
+    // This is done here because we need the user permission (gesture) for writting in the user's filesystem from the browser!
+    // and when huge amount of data is being parsed and passed to the sim**Monodomain functions, the window mightbe be unresponsive
+    //  leading to the user not being able to select the folder => the this.folderHandler is not defined => error  
+    var saveStart = gui.__folders.Save.__controllers[0].getValue();
+    var saveName = gui.__folders.Save.__controllers[2].getValue();
+    let ensightWriter:EnsightWriter | undefined;
+    if (saveStart >= 0){
+        ensightWriter = await EnsightWriter.create(saveName + '_geometry.geo', saveName + '_animation.case', saveName + '_state');
+    }
+
     const meshData:meshObj = await getMeshData();
     const cellObj:cellObj  = await manageDataFromGUI(gui, "Tissue");
 
     if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
-        SimLineMonodomain(gui, meshData, cellObj)
+        SimLineMonodomain(gui, meshData, cellObj, ensightWriter)
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
-        SimQuadMonodomain(gui, meshData, cellObj);
+        SimQuadMonodomain(gui, meshData, cellObj, ensightWriter);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
-        SimHexaMonodomain(gui, meshData, cellObj, li)
+        SimHexaMonodomain(gui, meshData, cellObj, li, ensightWriter)
     }else{
         console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }

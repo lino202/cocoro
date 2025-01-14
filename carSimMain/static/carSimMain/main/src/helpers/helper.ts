@@ -4,6 +4,8 @@ import { AddColors } from "./colorMap";
 
 export interface meshObj {
     vertexs: Float32Array,
+    actual_points: Float32Array,
+    actual_elems:  Uint32Array,
     render_elems:  Uint32Array,
     normals: Float32Array,
     elementType: string,
@@ -14,6 +16,17 @@ export interface meshObj {
     dx: number
 }
 
+export interface debugSettingsObj {
+    start: number,
+    end:  number,
+    state_name: string
+}
+
+export interface saveSettingsObj {
+    start: number,
+    end:  number,
+    save_name: string
+}
 
 export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0), isAnimation = true ) => {
     function step() {

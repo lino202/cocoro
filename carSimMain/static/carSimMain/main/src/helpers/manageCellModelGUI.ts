@@ -1,6 +1,7 @@
 import {cellTypesFK, cellModelParamsFKBR, cellModelParamsFKMBR, cellModelParamsFKGP, cellModelParamsFKMLR1} from '../cellular_definitions/fenton_karma_init'
 import {cellTypesGaur, cellModelParamsGaur} from '../cellular_definitions/gaur_init'
 import { GUI } from 'dat.gui';
+import { debugSettingsObj, saveSettingsObj } from './helper';
 
 export interface cellObj {
     cellModel: string,
@@ -67,8 +68,6 @@ function changeCellTypes(newCellType:string, gui:GUI, simScale:string = "Cellula
         gui.__folders.IonicParams.removeFolder(gui.__folders.IonicParams.__folders.Stim);
         var stimFolder:GUI = gui.__folders.IonicParams.addFolder('Stim');
     }
-   
-    
 
     var cellParamsConsts : Object;
     var cellParamsStims  : Object;
@@ -96,7 +95,7 @@ function changeCellTypes(newCellType:string, gui:GUI, simScale:string = "Cellula
 
 }
 
-export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,number>, visualParams:Record<string,number>, simScale:string="Cellular"): void {
+export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,number>, visualParams:Record<string,number>, simScale:string="Cellular", saveSettings:saveSettingsObj, debugSettings:debugSettingsObj): void {
     var cellModelsGui = { Cell_Model: 'Fenton_Karma'}
     var cellModelsType = { Cell_Type: 'BR'}
 
@@ -119,6 +118,12 @@ export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,numbe
         var stimFolder:GUI = simGUIFolder.addFolder('Stim');
         Object.keys(cellModelParamsFKBR.stim).forEach((k) => {stimFolder.add(cellModelParamsFKBR.stim, k);});
     }
+
+    const saveGUIFolder = gui.addFolder('Save');
+    const debugGUIFolder = gui.addFolder('Debug');
+    Object.keys(saveSettings).forEach((k) => {saveGUIFolder.add(saveSettings, k);});
+    Object.keys(debugSettings).forEach((k) => {debugGUIFolder.add(debugSettings, k);});
+
 }
 
 
@@ -127,6 +132,7 @@ export function manageDataFromGUI(gui: GUI, simScale:string="Cellular"): cellObj
     var cellTypeController  = gui.__folders.IonicParams.__controllers[1];
     const cellModel         = cellModelController.getValue();
     const cellType          = cellTypeController.getValue();
+
     var params;
 
     // Disable things (visualization and cell model name and type)
@@ -144,6 +150,20 @@ export function manageDataFromGUI(gui: GUI, simScale:string="Cellular"): cellObj
     var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = cellTypeController.domElement.querySelector('select');
     if (controllerDomElement != null){
         controllerDomElement.disabled = true;
+    }
+    const saveControllers = gui.__folders.Save.__controllers;
+    for (let i=0; i<saveControllers.length; i++){
+        var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = saveControllers[i].domElement.querySelector('input');
+        if (controllerDomElement != null){
+            controllerDomElement.disabled = true;
+        }
+    }
+    const debugControllers = gui.__folders.Debug.__controllers;
+    for (let i=0; i<debugControllers.length; i++){
+        var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = debugControllers[i].domElement.querySelector('input');
+        if (controllerDomElement != null){
+            controllerDomElement.disabled = true;
+        }
     }
 
 

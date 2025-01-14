@@ -1,7 +1,7 @@
 import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shaders/fenton_karma_wgsl.js'
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
 
-export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size) {
+export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, saveStart, debugStart, debugStateName) {
 
     var specificDefinitions;
     var specificComputeCore;
@@ -14,7 +14,24 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size) {
     }else{
         throw new Error(`Unknown Cell Model "${cellModel}"`)
     }
-    
+
+    // Manage save and debug buffers/arrays
+    var saveBufferDefinition = ``;
+    var saveBufferAction = ``;
+    if (saveStart >= 0){
+        saveBufferDefinition = `@binding(6) @group(0) var<storage, read_write> save_array : array<f32>;`;
+        saveBufferAction = `save_array[idx] = states[idx].vm;`;
+    }
+    var debugBufferDefinition = ``;
+    var debugBufferAction = ``;
+    if (debugStart >= 0){
+        if (saveStart >= 0){
+            debugBufferDefinition = `@binding(7) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+        }else{
+            debugBufferDefinition = `@binding(6) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+        }
+        debugBufferAction = `debug_array[idx] = states[idx].` + debugStateName + `;`;
+    }
 
     return /*wgsl*/`
 
@@ -44,7 +61,8 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size) {
         @binding(3) @group(0) var<uniform>             constants : Constants;
         @binding(4) @group(0) var<uniform>             integ : Integration;
         @binding(5) @group(0) var<uniform>             visual_params : VisualParams;
-        // @binding(6) @group(0) var<storage, read_write> results : array<f32>;
+        ${saveBufferDefinition}
+        ${debugBufferDefinition}
 
         var<private> current_compute_interval: f32;
 
@@ -89,7 +107,9 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size) {
                 if ( trunc(states[idx].t/visual_params.plot_dt) != current_compute_interval) {break;}
 
             }
-            // results[idx] = states[idx].vm;
+            
+            ${saveBufferAction}
+            ${debugBufferAction}
 
             //TODO Is strange but for the FentonKarma model we get extra negative (under MDP) Vm in the extremes
 
@@ -100,6 +120,3 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size) {
         }
     `;
 }
-
-
-

@@ -33,5 +33,5 @@ module.exports = {
                 loader: 'ts-shader-loader'
             }
         ]
-    }
+    },
 };

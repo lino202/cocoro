@@ -258,16 +258,27 @@ def parseMesh(binaryData):
     # Vertexs should be in um !!
     dx = np.max(np.abs(np.round(vertexs[0,:]).astype(int) - np.round(vertexs[1,:]).astype(int)))
 
-    # Scale for rendering
-    # minCoords = np.min(vertexs, axis=0)
-    # maxCoords = np.max(vertexs, axis=0)
-    # vertexs = (vertexs - minCoords)
-    # norm = maxCoords - minCoords
-    # vertexs = np.divide(vertexs, norm, where=norm>1e-5)
-
-       
+    # Normalize vertexs to -1 to 1
     vertexs = (vertexs - vertexs.min()) / (vertexs.max() - vertexs.min())
     vertexs = (vertexs * 2) - 1
+
+    # We need all the points for saving the mesh with actual ranges (not [-1,1]) and for hexa we need the 
+    # inner points (vertexs are the points/nodes for the render mesh)
+    actual_points = numpy_support.vtk_to_numpy(mesh.GetPoints().GetData())
+        
+    # Get the actual elems for the case where we need to save the mesh with ensight format
+    if mesh.GetMaxCellSize()==2:
+        actual_elems = numpy_support.vtk_to_numpy(mesh.GetCells().GetData())
+        actual_elems = actual_elems.reshape(-1,2+1)
+    elif mesh.GetMaxCellSize()==4:
+        actual_elems = numpy_support.vtk_to_numpy(mesh.GetCells().GetData())
+        actual_elems = actual_elems.reshape(-1,4+1)
+    elif mesh.GetMaxCellSize()==8:
+        actual_elems = numpy_support.vtk_to_numpy(mesh.GetCells().GetData())
+        actual_elems = actual_elems.reshape(-1,8+1)
+    else:
+        raise ValueError("Only line, quad and hexa are allowed")
+    actual_elems = actual_elems[:,1:]
     
     #Get render elems (triangles or lines)
     if mesh.GetMaxCellSize()==2:
@@ -352,7 +363,11 @@ def parseMesh(binaryData):
         fibers_long[:,0] = 1
 
     #Get all as one dimensional list for passing to json and js
+    # TODO we are importing/saving so much data, this can block the page if the mesh is too big
+    # the data saved can be reduced and connections can be computed in the gpu I assume pretty fast
     vertexs        = vertexs.flatten().tolist()
+    actual_points  = actual_points.flatten().tolist()
+    actual_elems   = actual_elems.flatten().tolist()
     render_elems   = render_elems.flatten().tolist()
     normals        = normals.flatten().tolist()
     stim_params    = stim_params.flatten().tolist()
@@ -360,5 +375,5 @@ def parseMesh(binaryData):
     fibers_long    = fibers_long.flatten().tolist()
     render_points_global_ids = render_points_global_ids.flatten().tolist()
 
-    return vertexs, render_elems, normals, elementType, stim_params, connections, fibers_long, render_points_global_ids, int(dx) #dx is a numpy.int -> problems with pickle parses so int
+    return vertexs, actual_points, actual_elems, render_elems, normals, elementType, stim_params, connections, fibers_long, render_points_global_ids, int(dx) #dx is a numpy.int -> problems with pickle parses so int
 
