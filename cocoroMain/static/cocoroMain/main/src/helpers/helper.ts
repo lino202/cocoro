@@ -28,6 +28,11 @@ export interface saveSettingsObj {
     save_name: string
 }
 
+export interface extraCanvases {
+    cellVar: HTMLCanvasElement | undefined,
+    pECG: HTMLCanvasElement | undefined
+}
+
 export const createAnimation = (draw:any, rotation:vec3 = vec3.fromValues(0,0,0), isAnimation = true ) => {
     function step() {
         if(isAnimation){
@@ -127,6 +132,7 @@ export const initGPU = async () => {
     }
 
     const canvas = document.getElementById('canvas-webgpu') as HTMLCanvasElement;
+    const extraCanvases:extraCanvases = getSelectedCanvases();
 
     const adapter = await navigator.gpu.requestAdapter({
         powerPreference: 'high-performance',              //Anyways you need to check chrome is using the most powerfull one or has accesibility to both on chip and discrete gpus 
@@ -153,25 +159,23 @@ export const initGPU = async () => {
         },
     }) as GPUDevice;
 
+    // We add extra canvas, but we leave the default order in order to have the main canvas and info useful for the 
+    // other functions calling this one, we padded an extra_canvases shit
+
+    // Primary
     const context = canvas.getContext('webgpu') as unknown as GPUCanvasContext;
     const devicePixelRatio = window.devicePixelRatio || 1;
-    // const size = [
-    //     canvas.clientWidth * devicePixelRatio,
-    //     canvas.clientHeight * devicePixelRatio,
-
-    // ];
     canvas.width = canvas.clientWidth * devicePixelRatio
     canvas.height = canvas.clientHeight * devicePixelRatio
 
     const textureFormat = await navigator.gpu.getPreferredCanvasFormat()
-    // const format = context.getPreferredFormat(adapter!);
     context.configure({
         device: device,
         format: textureFormat,
         alphaMode: "premultiplied"
     })
 
-    return{device, canvas, textureFormat, context};
+    return{device, canvas, textureFormat, context, extraCanvases};
 
 }
 
@@ -202,3 +206,20 @@ export function repeatFloat32Array(arr: Float32Array, n: number): Float32Array {
 
     return concatenatedArray;
 }
+
+function getSelectedCanvases(){
+    const cellVarCanvas = document.getElementById('cell_var_canvas') as HTMLCanvasElement;
+    const pECGCanvas = document.getElementById('pECG_canvas') as HTMLCanvasElement;
+
+    const cellVarBox = document.getElementById('cell_var_checkbox') as HTMLInputElement;
+    const pECGBox = document.getElementById('pECG_checkbox') as HTMLInputElement;
+
+    var selectedCanvases:extraCanvases = {'cellVar': undefined, 'pECG': undefined};
+    if (cellVarBox?.checked) {
+        selectedCanvases.cellVar = cellVarCanvas;
+    }
+    if (pECGBox?.checked) {
+        selectedCanvases.pECG = pECGCanvas;
+    }
+    return selectedCanvases;
+};

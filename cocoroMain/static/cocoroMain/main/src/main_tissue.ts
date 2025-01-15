@@ -3,7 +3,7 @@ import { SimQuadMonodomain} from './main_modules/SimQuadMonodomain';
 import { SimHexaMonodomain} from './main_modules/SimHexaMonodomain';
 import { checkWebGPU, meshObj } from './helpers/helper';
 import { LightInputsInterface } from './helpers/mysettings';
-import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj} from './helpers/manageCellModelGUI';
+import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj, blockGraphsGuiParams} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
 import { GUI } from 'dat.gui';
 import { Parser } from 'pickleparser'
@@ -36,7 +36,50 @@ const debugSettings = {
     state_name : 'vm',
 }
 
+// GUIS
 const gui = new GUI();
+
+// CellVar
+var checkbox = document.getElementById('cell_var_checkbox') as HTMLInputElement;
+checkbox.addEventListener('click', () => {toggleGraphs('cell_var');});
+const guiCellVarGraph = new GUI({ autoPlace: false });
+const guiCellVarGraphContainer = document.getElementById('cell_var_gui') as HTMLDivElement;
+guiCellVarGraphContainer.appendChild(guiCellVarGraph.domElement);
+
+const cellVarVisualizationFolder = guiCellVarGraph.addFolder('Visualization');
+const paramsCellVar = {
+    min: -100,
+    max: 60,
+    node_idx: 0,
+    var_name: 'vm',
+    num_points: 10000
+};
+cellVarVisualizationFolder.add(paramsCellVar, 'min');
+cellVarVisualizationFolder.add(paramsCellVar, 'max');
+cellVarVisualizationFolder.add(paramsCellVar, 'node_idx');
+cellVarVisualizationFolder.add(paramsCellVar, 'var_name');
+cellVarVisualizationFolder.add(paramsCellVar, 'num_points');
+cellVarVisualizationFolder.close();
+
+
+// pECG
+checkbox = document.getElementById('pECG_checkbox') as HTMLInputElement;
+checkbox.addEventListener('click', () => {toggleGraphs('pECG');});
+const guiPECGGraph = new GUI({ autoPlace: false });
+const guiPECGGraphContainer = document.getElementById('pECG_gui') as HTMLDivElement;
+guiPECGGraphContainer.appendChild(guiPECGGraph.domElement);
+
+const pECGVisualizationFolder = guiPECGGraph.addFolder('Visualization');
+const paramsPECG = {
+    min: -100,
+    max: 60,
+    num_points: 10000
+};
+pECGVisualizationFolder.add(paramsPECG, 'min');
+pECGVisualizationFolder.add(paramsPECG, 'max');
+pECGVisualizationFolder.add(paramsPECG, 'num_points');
+pECGVisualizationFolder.close();
+
 
 // Functions -------------------
 
@@ -69,6 +112,22 @@ async function getMeshData() {
 
     return meshData;    
 
+}
+
+function toggleGraphs(Id: string) {
+    const canvas = document.getElementById(Id + '_canvas') as HTMLCanvasElement;
+    const checkbox = document.getElementById(Id + '_checkbox') as HTMLInputElement;
+    const guiContainer = document.getElementById(Id + '_gui') as HTMLDivElement;
+
+    // Change canvas visibility
+    canvas.style.display = checkbox.checked ? 'block' : 'none';
+
+    // Initiallize change gui visibility
+    if (checkbox.checked) {
+        guiContainer.style.display = 'block';
+    } else {
+        guiContainer.style.display = 'none';
+    }
 }
 
 // Main ----------------
@@ -128,10 +187,11 @@ $('#btn-simulate').on('click', async ()=>{
 
     const meshData:meshObj = await getMeshData();
     const cellObj:cellObj  = await manageDataFromGUI(gui, "Tissue");
+    blockGraphsGuiParams(guiCellVarGraph, guiPECGGraph);
 
     if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
-        SimLineMonodomain(gui, meshData, cellObj, ensightWriter)
+        SimLineMonodomain(gui, meshData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph)
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
         SimQuadMonodomain(gui, meshData, cellObj, ensightWriter);

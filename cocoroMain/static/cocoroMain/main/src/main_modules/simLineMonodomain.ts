@@ -4,6 +4,7 @@ import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
 import { computeShaderMonodomainLine } from '../tissue_shaders/simLineMonodomainShader.js';
 import EnsightWriter from '../io/ensightWriter';
+import GraphsRenderer from '../graphs/GraphsRenderer';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
@@ -13,7 +14,7 @@ const createCamera =require('3d-view-controls')
 
 // This simulates line without Light as it is not neccessary
 // Voi refers to Variable of interest
-export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj, ensightWriter:EnsightWriter|undefined) => {
+export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj, ensightWriter:EnsightWriter|undefined, guiCellVarGraph:GUI, guiPECGGraph:GUI) => {
     
     console.log("RENDERING AND SIMULATING LINE");
     console.log("SIMULATING CELL MODEL:");
@@ -25,6 +26,9 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     const gpu = await initGPU();
     const device = gpu.device;
+    const graphsRenderer:GraphsRenderer = new GraphsRenderer(device, gpu.textureFormat, gpu.extraCanvases, 
+                                            cellObj, Math.trunc(meshData.actual_points.length / 3), 
+                                            guiCellVarGraph, guiPECGGraph);
     
     const integ = {
         simulate: true,
@@ -355,6 +359,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
         0,
         statesArray
     );
+    graphsRenderer.setStatesBuffer(statesBuffer, Float32Array.BYTES_PER_ELEMENT * statesArray.length);
 
     //Draw function for updating data on canvas and triggering gpu updates
     async function draw() {
@@ -416,6 +421,10 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             passEncoder.setBindGroup(0, renderBindGroup);
             passEncoder.drawIndexed(numberOfIndexes);
             passEncoder.end();
+        }
+        // Add render pass for possible new canvases
+        if (graphsRenderer.isActivated) {
+            graphsRenderer.render(commandEncoder)
         }
 
         // Save or debug - Copying buffer to buffer.

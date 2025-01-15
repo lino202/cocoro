@@ -5,75 +5,70 @@
 <head>
    <meta charset="utf-8">
    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-   <title>WebGPU Tissue</title>
+   <title>Cocoro Tissue</title>
    <meta name="description" content="">
    <meta name="viewport" content="width=device-width, initial-scale=1">
+   <style>
+      body {
+         margin: 0;
+         padding: 0;
+         display: flex;
+         flex-direction: column;
+         align-items: flex-start;
+      }
+      form, h1, h2, button {
+         margin: 5px 0;
+      }
+      select {
+         width: 100%;
+      }
+      .form-container {
+         display: flex;
+         gap: 20px;
+         align-items: center;
+      }
+      .canvas-container {
+         display: flex;
+         flex-wrap: wrap;
+         justify-content: flex-start;
+      }
+      .canvas-container canvas {
+         margin: 10px;
+      }
+   </style>
 </head>
 
 <body>
-   <h1>cocoro: WebGPU application for cardiac TISSUE simulation</h1><br>
-
-   <h2 id="id-gpu-check"></h2><br><br>
-
-   <!-- <form>
-      <label for="pseudo-bidomain">Pseudo-bidomain</label>
-      <input type="radio" id="pseudo" name="options">
-  
-      <label for="bidomain">Bidomain</label>
-      <input type="radio" id="bidomain" name="options">
-  
-      <label for="monodomain">Monodomain</label>
-      <input type="radio" id="monodomain" name="options">
-   </form>   -->
-  
-
-   <h1>List of Meshes in the Database</h1>
-   <form id="selected_mesh" >
-
-      <label for="selectMeshOptions">Select a Mesh:</label>
-      <select id="selectMeshOptions">
-         {% for file in files %}
-            <option value="{{ file }}">{{ file }}</option>
-         {% endfor %}
-      </select>
-   </form>
-
-   <div>
-     <br>
-     <button type='button' id='btn-simulate'>LET'S GO!</button>
-     <br>
+   <h1>Cocoro: WebGPU application for cardiac TISSUE simulation</h1>
+   <h2 id="id-gpu-check"></h2>
+   <div class="form-container">
+      <form id="selected_mesh">
+         <label for="selectMeshOptions">Select a Mesh:</label>
+         <select id="selectMeshOptions">
+            {% for file in files %}
+               <option value="{{ file }}">{{ file }}</option>
+            {% endfor %}
+         </select>
+      </form>
+      <form>
+         <label>Select Extra Plot:</label>
+         </br>
+         <label for="cell_var_checkbox">cellVar</label>
+         <input type="checkbox" id="cell_var_checkbox" name="canvasOptions">
+         <label for="pECG_checkbox">pECG</label>
+         <input type="checkbox" id="pECG_checkbox" name="canvasOptions">
+      </form>
    </div>
-   
-   <div>
-
-      <br>
-      <canvas id="canvas-webgpu" width="720" height="640"></canvas>
-      <br>
-      <!-- <button type='button' id='btn-print-mesh-info'>Print Mesh Info</button> -->
-   
+   <button type='button' id='btn-simulate'>LET'S GO!</button>
+   <div class="canvas-container">
+      <canvas id="canvas-webgpu" width="400" height="300"></canvas>
+      <canvas id="cell_var_canvas" width="400" height="300" style="display:none;"></canvas>
+      <div id="cell_var_gui" style="display: none;"></div>
    </div>
-
-   <!-- {{ path|json_script:"path" }}
-   <script>
-      const path = JSON.parse(document.getElementById('path').textContent);
-   </script> -->
-
-
+   <div class="canvas-container">
+      <canvas id="pECG_canvas" width="1100" height="400" style="display:none;"></canvas>
+      <div id="pECG_gui" style="display: none;"></div>
+   </div>
    <script src="{% static 'cocoroMain/main/dist/main_tissue.bundle.js' %}"></script>
-
-
-
-   
-   
-
-
-
-
-
-
-   
-
-   
-
 </body>
 </html>

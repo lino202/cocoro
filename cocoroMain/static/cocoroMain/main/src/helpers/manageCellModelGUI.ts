@@ -191,3 +191,24 @@ export function manageDataFromGUI(gui: GUI, simScale:string="Cellular"): cellObj
     return {cellModel: cellModel, states : params.states, constants: params.constants, stim: params.stim}
 
 }
+
+
+
+
+export function blockGraphsGuiParams(guiCellVarGraph: GUI, guiPECGGraph: GUI){
+
+    // Disable things
+    // Disable varName
+    var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = guiCellVarGraph.__folders.Visualization.__controllers[3].domElement.querySelector('input');
+    if (controllerDomElement != null){
+        controllerDomElement.disabled = true;
+    }
+    // disable num_points
+    var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = guiCellVarGraph.__folders.Visualization.__controllers[4].domElement.querySelector('input');
+    if (controllerDomElement != null){
+        controllerDomElement.disabled = true;
+    }
+    
+
+
+}
