@@ -70,6 +70,9 @@ export const SimCell = async (gui:GUI, cellModel:string, states:Record<string, n
     var debugEnd       = gui.__folders.Debug.__controllers[1].getValue();
     var debugStateName = gui.__folders.Debug.__controllers[2].getValue();
 
+    if (!(varName in states)) {
+        throw new Error(`${varName} is not a state variable of model ${cellModel}`)
+    }
     const gpu = await initGPU();
     const device = gpu.device;
 
