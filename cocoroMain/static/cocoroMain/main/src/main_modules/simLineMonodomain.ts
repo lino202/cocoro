@@ -19,8 +19,6 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
     // so it seems this will be it
     // This simulates line without Light as it is not neccessary
     // TODO ATTENTION Vm needs to be in states for debugging,
-    // The camera freezes when integ.simulate is off maybe you would like to move it but we will have to update camera varialbles
-    // write buffers and send render
 
     console.log("RENDERING AND SIMULATING LINE");
     console.log(`SIMULATING CELL MODEL: ${cellObj.cellModel}`);

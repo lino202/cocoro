@@ -402,45 +402,109 @@ class PECGGraph {
         
         this.statesBuffer = statesBuffer;
 
-        this.computeBindGroup2 = this.device.createBindGroup({
-            label: 'PECGGraph_ComputeBindGroup2',
-            layout: this.computePipeline2.getBindGroupLayout(0),
-                entries: [
-                    {
-                        binding: 0,
-                        resource: {
-                            buffer: this.potentialBuffer,
-                            offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials,
+        if (this.meshData.elementType == 'line'){
+            this.computeBindGroup2 = this.device.createBindGroup({
+                label: 'PECGGraph_ComputeBindGroup2',
+                layout: this.computePipeline2.getBindGroupLayout(0),
+                    entries: [
+                        {
+                            binding: 0,
+                            resource: {
+                                buffer: this.potentialBuffer,
+                                offset: 0,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials,
+                            },
                         },
-                    },
-                    {
-                        binding: 1,
-                        resource: {
-                            buffer: this.statesBuffer,
-                            offset: 0,
-                            size: statesByteLength,
+                        {
+                            binding: 1,
+                            resource: {
+                                buffer: this.statesBuffer,
+                                offset: 0,
+                                size: statesByteLength,
+                            },
                         },
-                    },
-                    {
-                        binding: 2,
-                        resource: {
-                            buffer: this.gradInvRBuffer,
-                            offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * this.nNodes*this.numPotentials*3,
+                        {
+                            binding: 2,
+                            resource: {
+                                buffer: this.gradInvRBuffer,
+                                offset: 0,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.nNodes*this.numPotentials*3,
+                            },
                         },
-                    },
-                    {
-                        binding: 3,
-                        resource: {
-                            buffer: this.integBuffer,
-                            offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * 1,
-                        },
-                    }
-                ],
-        });
+                        {
+                            binding: 3,
+                            resource: {
+                                buffer: this.integBuffer,
+                                offset: 0,
+                                size: Float32Array.BYTES_PER_ELEMENT * 1,
+                            },
+                        }
+                    ],
+            });
+    
+        }else if ((this.meshData.elementType == 'quad') || (this.meshData.elementType == 'hexa')){
 
+            const connectionsArray      = new Uint32Array(Object.values(this.meshData.connections));
+            const connectionsBuffer = this.device.createBuffer({
+                size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+            });
+
+            this.computeBindGroup2 = this.device.createBindGroup({
+                label: 'PECGGraph_ComputeBindGroup2',
+                layout: this.computePipeline2.getBindGroupLayout(0),
+                    entries: [
+                        {
+                            binding: 0,
+                            resource: {
+                                buffer: this.potentialBuffer,
+                                offset: 0,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials,
+                            },
+                        },
+                        {
+                            binding: 1,
+                            resource: {
+                                buffer: this.statesBuffer,
+                                offset: 0,
+                                size: statesByteLength,
+                            },
+                        },
+                        {
+                            binding: 2,
+                            resource: {
+                                buffer: this.gradInvRBuffer,
+                                offset: 0,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.nNodes*this.numPotentials*3,
+                            },
+                        },
+                        {
+                            binding: 3,
+                            resource: {
+                                buffer: this.integBuffer,
+                                offset: 0,
+                                size: Float32Array.BYTES_PER_ELEMENT * 1,
+                            },
+                        },
+                        {
+                            binding: 4,
+                            resource: {
+                                buffer: connectionsBuffer,
+                                offset: 0,
+                                size: Float32Array.BYTES_PER_ELEMENT * connectionsArray.length,
+                            },
+                        }
+                    ],
+            });
+
+            this.device.queue.writeBuffer(connectionsBuffer, 0, this.meshData.connections);
+    
+
+        }else{
+            throw new Error(`Element type ${this.meshData.elementType} not supported`)
+        }
+
+        
     }
 
     render(commandEncoder: GPUCommandEncoder){

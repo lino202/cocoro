@@ -58,8 +58,6 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, s
         ${saveBufferDefinition}
         ${debugBufferDefinition}
 
-        var<private> current_compute_interval: f32;
-
         @compute @workgroup_size(${workgroup_size})
         fn comp_monodomain_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             
@@ -99,7 +97,7 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, s
             //Pass to vms and save/debug if necessary
             ${saveBufferAction}
             ${debugBufferAction}
-            vms[idx] = states[idx].vm;                  
+            vms[idx] = states[idx].vm;
             
         }
     `;

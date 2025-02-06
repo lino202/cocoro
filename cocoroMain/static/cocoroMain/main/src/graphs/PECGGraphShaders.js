@@ -189,8 +189,126 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
         }
         
     `;
+}
 
+function computeGradQuad(specificDefinitions, nNodes, workgroup_size){
 
+    return /*wgsl*/`
+        
+        ${specificDefinitions}
+
+        struct Coords {
+            x : f32,
+            y : f32,
+            z : f32,
+        };
+
+        struct ElectrodesVectorial {
+            la : Coords,
+            ra : Coords,
+            ll : Coords,
+            rl : Coords,
+            v1 : Coords,
+            v2 : Coords,
+            v3 : Coords,
+            v4 : Coords,
+            v5 : Coords,
+            v6 : Coords
+        };
+
+        struct ElectrodesScalar {
+            la : f32,
+            ra : f32,
+            ll : f32,
+            rl : f32,
+            v1 : f32,
+            v2 : f32,
+            v3 : f32,
+            v4 : f32,
+            v5 : f32,
+            v6 : f32
+        };
+
+        struct Connections {
+            _i_j1  :  u32,
+            _i1_j1 :  u32,
+            _i1_j  :  u32,
+            _i1_1j :  u32,
+            _i_1j  :  u32,
+            _1i_1j :  u32,
+            _1i_j  :  u32,
+            _1i_j1 :  u32
+        };
+
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential : ElectrodesScalar;
+        @binding(1) @group(0) var<storage, read>       states         : array<States, ${nNodes}>;
+        @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
+        @binding(3) @group(0) var<uniform>             dx             : f32;
+        @binding(4) @group(0) var<storage, read>       connections    : array<Connections, ${nNodes}>;
+        
+        @compute @workgroup_size(${workgroup_size})
+        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+            
+            //Check for overcomputing and simulation stop
+            let idx = GlobalInvocationID.x; 
+            if(idx >= ${nNodes}) {return;}
+
+            // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
+            // this is computed for the node idx with respect to all 10 electrodes
+            let _i_j1  : u32 = connections[idx]._i_j1;           
+            let _i1_j1 : u32 = connections[idx]._i1_j1;         
+            let _i1_j  : u32 = connections[idx]._i1_j;         
+            let _i1_1j : u32 = connections[idx]._i1_1j;     
+            let _i_1j  : u32 = connections[idx]._i_1j;      
+            let _1i_1j : u32 = connections[idx]._1i_1j;
+            let _1i_j  : u32 = connections[idx]._1i_j;      
+            let _1i_j1 : u32 = connections[idx]._1i_j1; 
+            var ddx_V:f32 = 0.0;
+            var ddy_V:f32 = 0.0;
+
+            // ATTENTION The gradient is null in the normal direction of the boundary due to the Newmann condition, 
+            // this is a little trickier than the line, if we are on the top the ddy_V is null but no ddx_V
+
+            // after analysis we see we have 12 boundary cases, 4 lateral bands (lacking three neihgbouring nodes out of 8),
+            // and 8 corners, 4 inner and 4 outer corners.
+            // After analysing the boundaries we see that if we have both values for computing ddx or ddy they should be computed
+            // so if the neighbouring nodes exist ddx and/or ddy should be computed (might be zero or different to zero)
+            if ((_i1_j < ${nNodes}) & (_1i_j < ${nNodes})){
+                ddx_V = (states[_i1_j].vm - states[_1i_j].vm) / (2*dx);
+            }
+
+            if ((_i_j1 < ${nNodes}) & (_i_1j < ${nNodes})){
+                ddy_V = (states[_i_j1].vm - states[_i_1j].vm) / (2*dx);
+            }
+
+            // But the above condition do not take into account the 4 inner corners (the ddx and ddy are computed), so
+            // we need to take care of those manually, this do not work on holes made up of 1 quad elem ATTENTION
+            // TODO check if this should be zero as I believe it must be
+            if (((_i1_j1 == ${nNodes}) & (_i1_1j < ${nNodes}) & (_1i_1j < ${nNodes}) & (_1i_j1 < ${nNodes})) |
+                ((_i1_j1 < ${nNodes}) & (_i1_1j == ${nNodes}) & (_1i_1j < ${nNodes}) & (_1i_j1 < ${nNodes})) |
+                ((_i1_j1 < ${nNodes}) & (_i1_1j < ${nNodes}) & (_1i_1j == ${nNodes}) & (_1i_j1 < ${nNodes})) |
+                ((_i1_j1 < ${nNodes}) & (_i1_1j < ${nNodes}) & (_1i_1j < ${nNodes}) & (_1i_j1 == ${nNodes}))){
+                ddx_V = 0.0;
+                ddy_V = 0.0;
+            }
+            
+            // sum to the same location for accumalation (integral), in line we only need dx 
+            // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
+            // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
+            // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
+            extracellular_potential.la += ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y)) * 1e8;
+            extracellular_potential.ra += ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y)) * 1e8;
+            extracellular_potential.ll += ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y)) * 1e8;
+            extracellular_potential.rl += ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y)) * 1e8;
+            extracellular_potential.v1 += ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y)) * 1e8;
+            extracellular_potential.v2 += ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y)) * 1e8;
+            extracellular_potential.v3 += ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y)) * 1e8;
+            extracellular_potential.v4 += ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y)) * 1e8;
+            extracellular_potential.v5 += ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y)) * 1e8;
+            extracellular_potential.v6 += ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y)) * 1e8;
+        }
+        
+    `;
 }
 
 export function computePECGGraphShader2(cellModel, nNodes, elemType, workgroup_size=64){
@@ -208,8 +326,7 @@ export function computePECGGraphShader2(cellModel, nNodes, elemType, workgroup_s
     if (elemType=='line'){
         return computeGradLine(specificDefinitions, nNodes, workgroup_size)
     }else if (elemType=='quad'){
-        throw new Error(`Unknown Elem Type "${elemType}"`)
-        // return computeGradQuad(specificDefinitions, nNodes, workgroup_size)
+        return computeGradQuad(specificDefinitions, nNodes, workgroup_size)
     }else if (elemType=='hexa'){
         throw new Error(`Unknown Elem Type "${elemType}"`)
         // return computeGradHexa(specificDefinitions, nNodes, workgroup_size)

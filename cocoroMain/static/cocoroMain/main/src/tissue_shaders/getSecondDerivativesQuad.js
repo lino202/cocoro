@@ -9,14 +9,13 @@ export function getSecondDerivativesQuad(nNodes){
     var wgsl_quad_d2dydy_V = quad_d2dydy_V(nNodes);
     var wgsl_quad_d2dxdy_V = quad_d2dxdy_V(nNodes);
 
-
     return /*wgsl*/`
 
         if ( (_i_j1 < ${nNodes}) & (_i1_j1 < ${nNodes}) & (_i1_j < ${nNodes}) & (_i1_1j < ${nNodes}) & (_i_1j < ${nNodes}) & (_1i_1j < ${nNodes}) & (_1i_j < ${nNodes}) & (_1i_j1 < ${nNodes}) ) {
             // here I am in the center of domain
-            d2dxdx_V = (states[_1i_j].vm - 2 * states[idx].vm + states[_i1_j].vm) / pow(integ.dx,2);
-            d2dydy_V = (states[_i_1j].vm - 2 * states[idx].vm + states[_i_j1].vm) / pow(integ.dx,2);
-            d2dxdy_V = (states[_i1_j1].vm - states[_1i_j1].vm - states[_i1_1j].vm + states[_1i_1j].vm ) / (4 * pow(integ.dx, 2));    
+            d2dxdx_V = (vms_copy[_1i_j] - 2 * vms_copy[idx] + vms_copy[_i1_j]) / pow(integ.dx,2);
+            d2dydy_V = (vms_copy[_i_1j] - 2 * vms_copy[idx] + vms_copy[_i_j1]) / pow(integ.dx,2);
+            d2dxdy_V = (vms_copy[_i1_j1] - vms_copy[_1i_j1] - vms_copy[_i1_1j] + vms_copy[_1i_1j] ) / (4 * pow(integ.dx, 2));    
         
         }else{
             // Here I am in anywhere in the domain's boundary
