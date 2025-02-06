@@ -7,8 +7,6 @@ from tqdm import tqdm
 import vtk
 from vtk.util import numpy_support # type: ignore
 
-
-
 def saveVtkPolyMesh(mesh, fileName):
     writer = vtk.vtkXMLPolyDataWriter()
     writer.SetFileName(os.path.join(settings.MEDIA_ROOT, "{}.vtp".format(fileName)))
@@ -375,5 +373,25 @@ def parseMesh(binaryData):
     fibers_long    = fibers_long.flatten().tolist()
     render_points_global_ids = render_points_global_ids.flatten().tolist()
 
-    return vertexs, actual_points, actual_elems, render_elems, normals, elementType, stim_params, connections, fibers_long, render_points_global_ids, int(dx) #dx is a numpy.int -> problems with pickle parses so int
+    parsed = {'vertexs': vertexs, 'actual_points': actual_points, 'actual_elems': actual_elems, 'render_elems': render_elems, 'normals': normals, 'elementType': elementType, 
+                           'stim_params': stim_params, 'connections': connections, 'fibers_long': fibers_long, 'dx': int(dx), #dx is a numpy.int -> problems with pickle parses so int
+                           'render_points_global_ids': render_points_global_ids}
+
+    return parsed
+
+
+def parseElectrodes(binaryData):
+    # Read mesh from binary data, we use vtk to facilitate the processing
+    assert b'BINARY' in binaryData, "Only binary data is allowed and maybe you are not using .vtk!"
+    reader = vtk.vtkDataSetReader()
+    reader.SetReadFromInputString(True)
+    reader.SetBinaryInputString(binaryData, len(binaryData))
+    reader.Update()
+    mesh = reader.GetOutput()
+
+    # Get electrodes_positions
+    actual_points = numpy_support.vtk_to_numpy(mesh.GetPoints().GetData())
+    actual_points = actual_points.flatten().tolist()
+
+    return {'actual_points': actual_points}
 

@@ -16,6 +16,10 @@ export interface meshObj {
     dx: number
 }
 
+export interface electrodesObj {
+    actual_points: Float32Array,
+}
+
 export interface debugSettingsObj {
     start: number,
     end:  number,
@@ -135,7 +139,10 @@ export const initGPU = async () => {
     const extraCanvases:extraCanvases = getSelectedCanvases();
 
     const adapter = await navigator.gpu.requestAdapter({
-        powerPreference: 'high-performance',              //Anyways you need to check chrome is using the most powerfull one or has accesibility to both on chip and discrete gpus 
+        // The powerPreference option is currently ignored when calling requestAdapter() on Windows.  
+        // See https://crbug.com/369219127    
+        // Anyways you need to check chrome is using the most powerfull one or has accesibility to both on chip and discrete gpus
+        // powerPreference: 'high-performance', 
         forceFallbackAdapter: false
     }) as GPUAdapter;
 

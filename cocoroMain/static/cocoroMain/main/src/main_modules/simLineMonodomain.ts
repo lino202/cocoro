@@ -1,4 +1,4 @@
-import { createTransforms, createViewProjection, meshObj} from '../helpers/helper';
+import { createTransforms, createViewProjection, meshObj, electrodesObj} from '../helpers/helper';
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
@@ -14,7 +14,7 @@ const createCamera =require('3d-view-controls')
 
 // This simulates line without Light as it is not neccessary
 // Voi refers to Variable of interest
-export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellObj, ensightWriter:EnsightWriter|undefined, guiCellVarGraph:GUI, guiPECGGraph:GUI) => {
+export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesData:electrodesObj, cellObj:cellObj, ensightWriter:EnsightWriter|undefined, guiCellVarGraph:GUI, guiPECGGraph:GUI) => {
     
     console.log("RENDERING AND SIMULATING LINE");
     console.log("SIMULATING CELL MODEL:");
@@ -27,7 +27,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     const gpu = await initGPU();
     const device = gpu.device;
     const graphsRenderer:GraphsRenderer = new GraphsRenderer(device, gpu.textureFormat, gpu.extraCanvases, 
-                                            cellObj, Math.trunc(meshData.actual_points.length / 3), 
+                                            cellObj, meshData, electrodesData, 
                                             guiCellVarGraph, guiPECGGraph);
     
     const integ = {
@@ -53,7 +53,6 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
     // so it seems this will be it
     var saveStart = gui.__folders.Save.__controllers[0].getValue();
     var saveEnd = gui.__folders.Save.__controllers[1].getValue();
-    var saveName = gui.__folders.Save.__controllers[2].getValue();
     var debugStart = gui.__folders.Debug.__controllers[0].getValue();
     var debugEnd = gui.__folders.Debug.__controllers[1].getValue();
     var debugStateName = gui.__folders.Debug.__controllers[2].getValue();
@@ -67,7 +66,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
 
     const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices)
     const constantsArray    = new Float32Array(Object.values(cellObj.constants))
-    const integrationArray  = new Float32Array([integ.dt, integ.dx]) 
+    const integrationArray  = new Float32Array([integ.dt, integ.dx])
     const visualParamsArray = new Float32Array([gui.__folders.Visualization.__controllers[0].getValue(), 
                                                 gui.__folders.Visualization.__controllers[1].getValue(), 
                                                 gui.__folders.Visualization.__controllers[2].getValue()]
@@ -445,6 +444,21 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             commandEncoder.copyBufferToBuffer(debugBuffer, 0, readDebugBuffer, 0, nodeResultsSize);
         }
 
+        // Debug delete after---------------------------------------
+        var TEMPORALSIZE:number|undefined;
+        var TEMPORALGETBuffer:GPUBuffer|undefined = undefined;
+        if (graphsRenderer.pECGGraph != undefined){
+            TEMPORALSIZE = Float32Array.BYTES_PER_ELEMENT * graphsRenderer.pECGGraph.nNodes;
+            TEMPORALGETBuffer = device.createBuffer({
+                label: 'TEMPORALGETBuffer',
+                size: TEMPORALSIZE,
+                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+            });
+            commandEncoder.copyBufferToBuffer(graphsRenderer.pECGGraph.TEMPORALSETBUFFER, 0, TEMPORALGETBuffer, 0, TEMPORALSIZE);
+
+        }
+
+
         // Submit GPU commands.
         const gpuCommands = commandEncoder.finish();
         device.queue.submit([gpuCommands]);
@@ -482,6 +496,14 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, cellObj:cellO
             console.log(integ.simulation_time)
             console.log(new Float32Array(arrayBuffer));
         }
+
+        // if(TEMPORALGETBuffer!=undefined){
+        //     await TEMPORALGETBuffer.mapAsync(GPUMapMode.READ);
+        //     const arrayBuffer = TEMPORALGETBuffer.getMappedRange();
+        //     console.log(integ.simulation_time)
+        //     console.log(new Float32Array(arrayBuffer));
+        // }
+
         
         stats.end();
 

@@ -1,9 +1,9 @@
 import { SimLineMonodomain} from './main_modules/simLineMonodomain';
 import { SimQuadMonodomain} from './main_modules/SimQuadMonodomain';
 import { SimHexaMonodomain} from './main_modules/SimHexaMonodomain';
-import { checkWebGPU, meshObj } from './helpers/helper';
+import { checkWebGPU, meshObj, electrodesObj } from './helpers/helper';
 import { LightInputsInterface } from './helpers/mysettings';
-import {  initGUI4UniqueCellModel, manageDataFromGUI, cellObj, blockGraphsGuiParams} from './helpers/manageCellModelGUI';
+import { initGUI4UniqueCellModel, manageDataFromGUI, cellObj, blockGraphsGuiParams} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
 import { GUI } from 'dat.gui';
 import { Parser } from 'pickleparser'
@@ -71,7 +71,7 @@ guiPECGGraphContainer.appendChild(guiPECGGraph.domElement);
 
 const pECGVisualizationFolder = guiPECGGraph.addFolder('Visualization');
 const paramsPECG = {
-    min: -100,
+    min: -60,
     max: 60,
     num_points: 10000
 };
@@ -114,6 +114,31 @@ async function getMeshData() {
 
 }
 
+
+async function getElectrodesData() {
+    // Here we load the .pickle file with mesh proccesed data 
+    // we use the parser https://github.com/ewfian/pickleparser
+    // For now chrome is passing the request to http://localhost:8000/media/ without cors or cors-django-headers
+    // which is fine for development but there will need to review this if one day we arrive to prod or public availability of the app/webpage
+    // If you are on 127.0.0.1: or similar in the browser you'll get the CORS error
+    const fileSelector = document.getElementById('selectElectrodesOptions') as HTMLSelectElement;
+    const electrodesURL: string = 'http://localhost:8000/media/' + fileSelector.value + '.pickle'
+    console.log('Electrodes URL:', electrodesURL);
+
+    const parser = new Parser();
+    const response = await fetch(electrodesURL);
+    const data = await response.blob();
+    const arrayBuffer = await data.arrayBuffer();
+    const byteArray = new Uint8Array(arrayBuffer);
+    var electrodesData:electrodesObj = parser.parse(byteArray);
+
+    // TODO what happens if there is no option 
+    electrodesData.actual_points = new Float32Array(electrodesData.actual_points)
+
+    return electrodesData;    
+
+}
+
 function toggleGraphs(Id: string) {
     const canvas = document.getElementById(Id + '_canvas') as HTMLCanvasElement;
     const checkbox = document.getElementById(Id + '_checkbox') as HTMLInputElement;
@@ -150,7 +175,7 @@ $(document).ready(function(){
 // TODO add AP plot
 // TODO add pECGs
 // TODO Rewrite all in OOP (and names and labels to webgpu instances for error handling) THIS SHOULD BE DONE SLOWLY AS WEE ADD NEW TODOS
-// TODO add FEM (search for FEM in the project) see continuos and discontinous (might be better for GPU) Galerkin methods, checked far field form Niccolo and Fenton
+// TODO add FEM (search for FEM in the project) see continuos and discontinous (might be better for GPU) Galerkin methods, checked far field form Niccolo and Fenton (there is a new paper from kabodian-fenton where they use the ghost node in the boundary as we do)
 // TODO add CS
 // TODO show stim regions on gui and made available the modification of those parameters
 // TODO stim with click
@@ -186,18 +211,19 @@ $('#btn-simulate').on('click', async ()=>{
     }
 
     const meshData:meshObj = await getMeshData();
+    const electrodesData:electrodesObj = await getElectrodesData();
     const cellObj:cellObj  = await manageDataFromGUI(gui, "Tissue");
     blockGraphsGuiParams(guiCellVarGraph, guiPECGGraph);
 
     if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
-        SimLineMonodomain(gui, meshData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph)
+        SimLineMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph)
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
-        SimQuadMonodomain(gui, meshData, cellObj, ensightWriter);
+        SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
-        SimHexaMonodomain(gui, meshData, cellObj, li, ensightWriter)
+        SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter)
     }else{
         console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }

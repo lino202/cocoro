@@ -1,4 +1,4 @@
-import { createTransforms, createViewProjection, meshObj} from '../helpers/helper';
+import { createTransforms, createViewProjection, meshObj, electrodesObj} from '../helpers/helper';
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
@@ -10,7 +10,7 @@ import Stats from "stats.js";
 
 const createCamera = require('3d-view-controls');
 
-export const SimQuadMonodomain = async (gui: GUI, meshData: meshObj, cellObj: cellObj, ensightWriter:EnsightWriter|undefined) => {
+export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, electrodesData:electrodesObj, cellObj:cellObj, ensightWriter:EnsightWriter|undefined) => {
 
     console.log("RENDERING AND SIMULATING SURFACE");
     console.log("SIMULATING CELL MODEL:");
@@ -46,7 +46,6 @@ export const SimQuadMonodomain = async (gui: GUI, meshData: meshObj, cellObj: ce
     // so it seems this will be it
     var saveStart = gui.__folders.Save.__controllers[0].getValue();
     var saveEnd = gui.__folders.Save.__controllers[1].getValue();
-    var saveName = gui.__folders.Save.__controllers[2].getValue();
     var debugStart = gui.__folders.Debug.__controllers[0].getValue();
     var debugEnd = gui.__folders.Debug.__controllers[1].getValue();
     var debugStateName = gui.__folders.Debug.__controllers[2].getValue();

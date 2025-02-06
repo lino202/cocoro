@@ -45,7 +45,7 @@
       <form id="selected_mesh">
          <label for="selectMeshOptions">Select a Mesh:</label>
          <select id="selectMeshOptions">
-            {% for file in files %}
+            {% for file in mesh_files %}
                <option value="{{ file }}">{{ file }}</option>
             {% endfor %}
          </select>
@@ -57,6 +57,14 @@
          <input type="checkbox" id="cell_var_checkbox" name="canvasOptions">
          <label for="pECG_checkbox">pECG</label>
          <input type="checkbox" id="pECG_checkbox" name="canvasOptions">
+      </form>
+      <form id="selected_electrodes">
+         <label for="selectElectrodesOptions">Select Electrodes:</label>
+         <select id="selectElectrodesOptions">
+            {% for file in electrodes_files %}
+               <option value="{{ file }}">{{ file }}</option>
+            {% endfor %}
+         </select>
       </form>
    </div>
    <button type='button' id='btn-simulate'>LET'S GO!</button>

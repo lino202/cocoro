@@ -3,7 +3,7 @@ from django.conf import settings
 from .forms import UploadMeshForm
 import os 
 import pickle
-from .utils import parseMesh
+from .utils import parseMesh, parseElectrodes
 
 
 # Main view.
@@ -11,8 +11,15 @@ from .utils import parseMesh
 def tissue(request):
     # Retrieve data from the database
     files = os.listdir(settings.MEDIA_ROOT)
-    files = [file.split('.')[0] for file in files if ".pickle" in file]
-    return render(request, 'cocoroMain/tissue.html', {'files': files})
+    mesh_files = []
+    electrodes_files = []
+    for file in files:
+        if '.pickle' in file and not 'electrodes' in file:
+            mesh_files.append(file.split('.')[0])
+        if '.pickle' in file and 'electrodes' in file:
+            electrodes_files.append(file.split('.')[0])
+    
+    return render(request, 'cocoroMain/tissue.html', {'mesh_files': mesh_files, 'electrodes_files': electrodes_files})
 
 # Cellular view.
 # Here we can run cellular simulations and plots
@@ -27,22 +34,24 @@ def upload(request):
         form = UploadMeshForm(request.POST, request.FILES)
         
         if form.is_valid():
-            # PARSE
+            
             uploadedFile = request.FILES['file']
-            vertexs, actual_points, actual_elems, render_elems, normals, elementType, stim_params, connections, fibers_long, render_points_global_ids, dx = parseMesh(uploadedFile.read())
 
-            mesh_parsed = {'vertexs': vertexs, 'actual_points': actual_points, 'actual_elems': actual_elems, 'render_elems': render_elems, 'normals': normals, 'elementType': elementType, 
-                           'stim_params': stim_params, 'connections': connections, 'fibers_long': fibers_long, 'dx': dx,
-                           'render_points_global_ids': render_points_global_ids}
-
+            # PARSE
+            # Has the user loaded electrodes or a mesh?
+            if 'electrodes' in uploadedFile.name:
+                parsed = parseElectrodes(uploadedFile.read())
+            else:
+                parsed = parseMesh(uploadedFile.read())
+                
             # SAVE
             # name = createUniqueName(uploadedFile.name) 
             name = uploadedFile.name.split('.')[0]
             path = os.path.join(settings.MEDIA_ROOT, "{}.pickle".format(name))
             with open(path, 'wb') as f:
-                pickle.dump(mesh_parsed, f)
+                pickle.dump(parsed, f)
 
-            return redirect('/tissue')
+            # return redirect('/tissue')
 
     else:
         form = UploadMeshForm()

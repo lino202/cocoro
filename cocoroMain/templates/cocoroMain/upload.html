@@ -8,13 +8,13 @@
 </head>
 
 <body>
-   <h1>Cocoro: Upload your mesh to the database</h1><br>
+   <h1>Cocoro: Upload your mesh (domain or electrodes) to the database</h1><br>
   
    <div>
       <form enctype="multipart/form-data" method="post">
          {% csrf_token %}
          {{ form }}  
-         <button type="submit" id='btn-uploadMesh'>Upload Mesh</button>
+         <button type="submit" id='btn-uploadMesh'>Upload</button>
      </form>
 
    </div>
