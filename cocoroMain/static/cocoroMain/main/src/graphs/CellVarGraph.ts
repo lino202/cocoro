@@ -19,18 +19,18 @@ class CellVarGraph {
     renderPipeline: GPURenderPipeline;
     computePipeline: GPUComputePipeline;
     renderPassDescriptor: GPURenderPassDescriptor;
-    numberOfIndexes : number;
-    xCoordsBuffer   : GPUBuffer;
-    indexBuffer     : GPUBuffer;
-    voiBuffer       : GPUBuffer;
-    cellObj         : cellObj;
-    nNodes          : number;
-    workgroupSize   : number;
-    
-    visualParamsBuffer: GPUBuffer | null = null;
-    statesBuffer: GPUBuffer | null = null;
-    nodeIdxBuffer: GPUBuffer | null = null;
+    numberOfIndexes     : number;
+    xCoordsBuffer       : GPUBuffer;
+    indexBuffer         : GPUBuffer;
+    voiBuffer           : GPUBuffer;
+    voiBufferCopy       : GPUBuffer;
+    visualParamsBuffer  : GPUBuffer;
+    nodeIdxBuffer       : GPUBuffer;
+    cellObj             : cellObj;
+    nNodes              : number;
+    workgroupSize       : number;
     computeBindGroup: GPUBindGroup | null = null;
+    statesBuffer: GPUBuffer | null = null;
 
     constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:cellObj, nNodes:number,
         gui:GUI, workgroupSize:number=64) {
@@ -48,7 +48,7 @@ class CellVarGraph {
         this.workgroupSize = workgroupSize;
 
         if ((this.nodeIdx<0) || (this.nodeIdx>=this.nNodes)){
-            // Do not throw error we all are stupid, and the graph will only show a constant value
+            // Do not be stupid do not throw an error -> the graph will only show a constant value
             // throw new Error(`The selected node ${this.nodeIdx} is out of range of a mesh with ${this.nNodes} nodes`)
             console.log(`The selected node ${this.nodeIdx} is out of range for a mesh with ${this.nNodes} nodes`)
         }
@@ -128,18 +128,33 @@ class CellVarGraph {
 
         
         //  INIT BUFFERS
-        const indexs  = this.getIndexesForLine();
-        const xcoords = this.getXCoords();
+        const indexs        = this.getIndexesForLine();
+        const xcoords       = this.getXCoords();
         const voiInitValues = new Float32Array(this.numPoints);
         if (this.varName in this.cellObj.states) {
-            voiInitValues.fill(((this.cellObj.states[this.varName] - this.min) / (this.max-this.min)) * 2 - 1);
+            voiInitValues.fill(((this.cellObj.states[this.varName] - this.min) / (this.max-this.min)) * 2 - 1); //remember this should be between [-1,1]
         } else {
             throw new Error(`${this.varName} is not a state variable of model ${this.cellObj.cellModel}`)
         }
         this.numberOfIndexes  = indexs.length;
         this.xCoordsBuffer    = createGPUBuffer(this.device, xcoords);
         this.indexBuffer      = createGPUBufferUint(this.device, indexs);
-        this.voiBuffer        = createGPUBuffer(this.device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
+        this.voiBuffer        = createGPUBuffer(this.device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+        this.voiBufferCopy    = createGPUBuffer(this.device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);  // this avoids dara race
+
+        // ExtraBuffers
+        const visualParamsArray = new Float32Array([this.min, this.max]);
+        this.visualParamsBuffer = this.device.createBuffer({
+            label: "CellVarGraph_VisualParamsBuffer",
+            size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+        this.nodeIdxBuffer = this.device.createBuffer({
+            label: "CellVarGraph_nodeIdxBuffer",
+            size: Uint32Array.BYTES_PER_ELEMENT,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+
 
         // INIT - COMPUTE
         this.computePipeline = this.device.createComputePipeline({
@@ -180,19 +195,6 @@ class CellVarGraph {
         
         this.statesBuffer = statesBuffer;
 
-        // ExtraBuffers
-        const visualParamsArray = new Float32Array([this.min, this.max]);
-        this.visualParamsBuffer = this.device.createBuffer({
-            label: "CellVarGraph_VisualParamsBuffer",
-            size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-        }) as GPUBuffer;
-        this.nodeIdxBuffer = this.device.createBuffer({
-            label: "CellVarGraph_nodeIdxBuffer",
-            size: Uint32Array.BYTES_PER_ELEMENT,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-        }) as GPUBuffer;
-
         this.computeBindGroup = this.device.createBindGroup({
             label: 'CellVarGraph_ComputeBindGroup',
             layout: this.computePipeline.getBindGroupLayout(0),
@@ -218,7 +220,7 @@ class CellVarGraph {
                         resource: {
                             buffer: this.visualParamsBuffer,
                             offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+                            size: Float32Array.BYTES_PER_ELEMENT * 2,  //min and max
                         },
                     },
                     {
@@ -228,6 +230,14 @@ class CellVarGraph {
                             offset: 0,
                             size: Uint32Array.BYTES_PER_ELEMENT,
                         },
+                    },
+                    {
+                        binding: 4,
+                        resource: {
+                            buffer: this.voiBufferCopy,
+                            offset: 0,
+                            size: Float32Array.BYTES_PER_ELEMENT * this.numPoints,
+                        },
                     }
                 ],
         });
@@ -235,33 +245,21 @@ class CellVarGraph {
 
     render(commandEncoder: GPUCommandEncoder){
 
-        if ((this.visualParamsBuffer instanceof GPUBuffer) && (this.nodeIdxBuffer instanceof GPUBuffer)){
-            this.device.queue.writeBuffer(
-                this.visualParamsBuffer,
-                0,
-                new Float32Array([
-                    this.gui.__folders.Visualization.__controllers[0].getValue(),   
-                    this.gui.__folders.Visualization.__controllers[1].getValue()
-                ])
-            );
-            
-
-            this.nodeIdx = this.gui.__folders.Visualization.__controllers[2].getValue()
-            // Huge amount of console.logs we only leave the initial control on node_idx
-            // if ((this.nodeIdx<0) || (this.nodeIdx>=this.nNodes)){
-            //     // Do not throw error we all are stupid, and the graph will only show a constant value
-            //     // throw new Error(`The selected node ${this.nodeIdx} is out of range of a mesh with ${this.nNodes} nodes`)
-            //     console.log(`The selected node ${this.nodeIdx} is out of range of a mesh with ${this.nNodes} nodes`)
-            // }
-            this.device.queue.writeBuffer(
-                this.nodeIdxBuffer,
-                0,
-                new Uint32Array([this.nodeIdx]) //Is neccesary to make a UintArray even if it is one element
-            );
-        }else{
-            throw new Error("Visual and nodeIdx buffers should be init as GPUBuffers in CellVarGraph")
-        }
-
+        this.device.queue.writeBuffer(
+            this.visualParamsBuffer,
+            0,
+            new Float32Array([
+                this.gui.__folders.Visualization.__controllers[0].getValue(),   
+                this.gui.__folders.Visualization.__controllers[1].getValue()
+            ])
+        );
+        
+        this.nodeIdx = this.gui.__folders.Visualization.__controllers[2].getValue()
+        this.device.queue.writeBuffer(
+            this.nodeIdxBuffer,
+            0,
+            new Uint32Array([this.nodeIdx]) //Is neccesary to make a UintArray even if it is one element
+        );
 
         {   //Compute Update
             const passEncoder = commandEncoder.beginComputePass();
@@ -282,6 +280,7 @@ class CellVarGraph {
             passEncoder.drawIndexed(this.numberOfIndexes);
             passEncoder.end();
         }
+        commandEncoder.copyBufferToBuffer(this.voiBuffer, 0, this.voiBufferCopy, 0, this.numPoints * Float32Array.BYTES_PER_ELEMENT);
     }
 
 }

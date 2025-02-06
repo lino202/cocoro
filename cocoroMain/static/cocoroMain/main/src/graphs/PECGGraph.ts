@@ -38,7 +38,6 @@ class PECGGraph {
     statesBuffer: GPUBuffer | null = null;
     computeBindGroup2: GPUBindGroup | null = null;
     computeBindGroup3: GPUBindGroup;
-    TEMPORALSETBUFFER: GPUBuffer;
 
     constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:cellObj,
                 meshData:meshObj, electrodesData:electrodesObj, nNodes:number, gui:GUI, workgroupSize:number=64) {
@@ -57,12 +56,6 @@ class PECGGraph {
         this.numPotentials = 10;
         this.numECGLeads   = 12;
 
-        this.TEMPORALSETBUFFER = this.device.createBuffer({
-            label: 'TEMPORALSETBUFFER',
-            size: Float32Array.BYTES_PER_ELEMENT * this.nNodes,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
-        });
-
         if (this.electrodesData.actual_points.length == 0){
             throw new Error(`The electrodes positions are null for this mesh`)
         }
@@ -79,13 +72,12 @@ class PECGGraph {
             alphaMode: "opaque" // All pixels should be opaque without any alpha??
         });
         
-        // Set the 13 buffers for the 12 lines + the voi (we combined the 12 lines in one)
         const renderBuffers : GPUVertexBufferLayout[] = [
             {
                 arrayStride: Float32Array.BYTES_PER_ELEMENT * 2,
                 attributes: [
                     {
-                        //X-Y coordinates for zero baseline
+                        //X-Y coordinates for 12 spaced lines
                         shaderLocation: 0,
                         format: "float32x2",
                         offset: 0
@@ -146,8 +138,8 @@ class PECGGraph {
         // INIT - COMPUTE, we need 3 compute shaders:--------------------------------------------------------------
         // 1- is computed only once for getting grad 1/r, which is equal to - (r_vec - r'_vec) / r^3 where r is the magnitude |r_vec - r'_vec| and r_vec is 
         // lead position and r'_vec is the node position 
-        // 2- for the extracellular potential on the electrode this is compute in every iteration as Vm changes
-        // 3- the other for the computation of the 12 lead electrocardiographic potential and filling the arrays for rendering the graph
+        // 2- for the extracellular potential on the electrode this is computed in every iteration (according to plot_dt) as Vm changes
+        // 3- the other for the computation of the 12 lead electrocardiographic potential and moving the values for rendering the graph
 
         // First compute shader
         const gradInvRArr  = new Float32Array(this.nNodes*this.numPotentials*3).fill(0);
@@ -184,9 +176,9 @@ class PECGGraph {
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
         }) as GPUBuffer;
 
-        const indexs  = this.getIndexesFor12Leads();   //This is the same for all 12 lines
-        const coords = this.getXYCoords();
-        const voiInitValues = new Float32Array(this.numPoints * this.numECGLeads).fill(0);
+        const indexs          = this.getIndexesFor12Leads();   //This is the same for all 12 lines
+        const coords          = this.getXYCoords();
+        const voiInitValues   = new Float32Array(this.numPoints * this.numECGLeads).fill(0);
         this.numberOfIndexes  = indexs.length;
         this.coordsBuffer     = createGPUBuffer(this.device, coords);
         this.indexBuffer      = createGPUBufferUint(this.device, indexs);
@@ -444,14 +436,6 @@ class PECGGraph {
                             buffer: this.integBuffer,
                             offset: 0,
                             size: Float32Array.BYTES_PER_ELEMENT * 1,
-                        },
-                    },
-                    {
-                        binding: 4,
-                        resource: {
-                            buffer: this.TEMPORALSETBUFFER,
-                            offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * this.nNodes,
                         },
                     }
                 ],

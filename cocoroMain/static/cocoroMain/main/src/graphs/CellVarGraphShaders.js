@@ -25,9 +25,10 @@ export function renderCellVarGraphComputeShader(cellModel, nNodes, nVertexs, var
         };
 
         @binding(0) @group(0) var<storage, read_write> vois : array<f32>; //nVertexs here gives error with function ArrayLength -> it produces no constructor match
-        @binding(1) @group(0) var<storage, read> states : array<States, ${nNodes}>;
-        @binding(2) @group(0) var<storage, read> visualization : VisualParams;
-        @binding(3) @group(0) var<storage, read> node_idx : u32;
+        @binding(1) @group(0) var<storage, read>       states : array<States, ${nNodes}>;
+        @binding(2) @group(0) var<storage, read>       visualization : VisualParams;
+        @binding(3) @group(0) var<storage, read>       node_idx : u32;
+        @binding(4) @group(0) var<storage, read>       vois_copy : array<f32>;
 
         @compute @workgroup_size(${workgroup_size})
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -38,7 +39,7 @@ export function renderCellVarGraphComputeShader(cellModel, nNodes, nVertexs, var
 
             // Vois not in the right tip of the line should just switch the value
             if (idx <= (arrayLength(&vois)-2)) {
-                vois[idx] = vois[idx+1];
+                vois[idx] = vois_copy[idx+1];
                 return;    
             }
             
@@ -71,6 +72,6 @@ export const renderCellVarGraphVertexShader = /*wgsl*/`
 export const renderCellVarGraphFragmentShader = /*wgsl*/`
     @fragment
     fn fs_main ()  ->  @location(0) vec4<f32> {
-        return vec4(1.0, 0.0, 0.0, 1.0);
+        return vec4(1.0, 0.0, 0.0, 1.0); // plot in sexy red
     }
 `;

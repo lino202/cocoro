@@ -37,7 +37,6 @@ export function computePECGGraphShader1(nNodes, workgroup_size=64){
             if(idx >= ${nNodes}) {return;}
             
             // get grad 1/r for all leads with respect to node idx, maybe take care of r near zero?
-
             var r_la:f32 = sqrt( pow(nodes_positions[idx].x - electrodes_positions.la.x, 2) + 
                                 pow(nodes_positions[idx].y - electrodes_positions.la.y, 2) + 
                                 pow(nodes_positions[idx].z - electrodes_positions.la.z, 2) );
@@ -155,8 +154,6 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
         @binding(1) @group(0) var<storage, read>       states : array<States, ${nNodes}>;
         @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             dx : f32;
-        @binding(4) @group(0) var<storage, read_write> debug_array : array<f32>;
-        
         
         @compute @workgroup_size(${workgroup_size})
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -167,15 +164,13 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
 
             // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
             // this is computed for the node idx with respect to all 10 electrodes
-            var ddx_V = 0.0;
+            var ddx_V:f32 = 0.0;
 
             // The gradient is null in the extremes of the line due to the Newmann condition, 
             // so we only change the default 0 value when we are in the middle nodes of the line
             if ((idx<${nNodes}-1) && (idx>0)) {
                 ddx_V = (states[idx+1].vm - states[idx-1].vm) / (2*dx);
             }
-
-            debug_array[idx] = grad_inv_r_arr[idx].la.x;
             
             // sum to the same location for accumalation (integral), in line we only need dx 
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
@@ -226,8 +221,6 @@ export function computePECGGraphShader2(cellModel, nNodes, elemType, workgroup_s
 
 export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=64){
 
-    // var voisLength = numPoints * numECGLeads;
-
     return /*wgsl*/`
 
         struct ElectrodesScalar {
@@ -244,14 +237,14 @@ export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=6
         };
 
         struct VisualParams {
-            voi_min : f32,
-            voi_max : f32       
+            min : f32,
+            max : f32       
         };
 
-        @binding(0) @group(0) var<storage, read> extracellular_potential : ElectrodesScalar;
+        @binding(0) @group(0) var<storage, read>       extracellular_potential : ElectrodesScalar;
         @binding(1) @group(0) var<storage, read_write> vois : array<f32>; //This vois is an array with all the values shown in the pECG graph so it has 12*numPoints (graph points) values
-        @binding(2) @group(0) var<storage, read> visualization : VisualParams;
-        @binding(3) @group(0) var<storage, read> vois_copy : array<f32>;
+        @binding(2) @group(0) var<storage, read>       visualization : VisualParams;
+        @binding(3) @group(0) var<storage, read>       vois_copy : array<f32>;
         
         @compute @workgroup_size(${workgroup_size})
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -327,7 +320,7 @@ export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=6
             // Pass to vois and normalize to plot
             if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
                 //range needs to be [-0.5,0.5] as after the vertex_shader sums +/-0.5
-                vois[idx] = ((vois[idx] - visualization.voi_min) / (visualization.voi_max - visualization.voi_min)) - 0.5; 
+                vois[idx] = ((vois[idx] - visualization.min) / (visualization.max - visualization.min)) - 0.5; 
                 if (vois[idx] > max_value_to_plot){
                     vois[idx] = max_value_to_plot;
                 }
@@ -339,8 +332,6 @@ export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=6
         }
         
     `;
-
-
 }
 
 export const renderPECGGraphVertexShader = /*wgsl*/`
@@ -360,6 +351,6 @@ export const renderPECGGraphVertexShader = /*wgsl*/`
 export const renderPECGGraphFragmentShader = /*wgsl*/`
     @fragment
     fn fs_main ()  ->  @location(0) vec4<f32> {
-        return vec4(1.0, 0.0, 0.0, 1.0);
+        return vec4(1.0, 0.0, 0.0, 1.0); // plot in red
     }
 `;
