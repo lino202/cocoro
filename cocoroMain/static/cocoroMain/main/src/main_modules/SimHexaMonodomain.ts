@@ -401,7 +401,7 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
     let readDebugBuffer: GPUBuffer;
     if (debugStart >= 0) {
         if (!(debugStateName in cellObj.states)) {
-            throw new Error(`Debug state name "${debugStateName}" is not a valid state in cellObj.states`);
+            throw new Error(`Debug state name "${debugStateName}" is not a valid state for ${cellObj.cellModel} cell model`);
         }
 
         debugBuffer = device.createBuffer({

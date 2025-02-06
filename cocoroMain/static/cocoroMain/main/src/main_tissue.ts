@@ -1,6 +1,6 @@
 import { SimLineMonodomain } from './main_modules/simLineMonodomain'
-import { SimQuadMonodomain} from './main_modules/SimQuadMonodomain';
-import { SimHexaMonodomain} from './main_modules/SimHexaMonodomain';
+import { SimQuadMonodomain} from './main_modules/simQuadMonodomain';
+import { SimHexaMonodomain} from './main_modules/simHexaMonodomain';
 import { checkWebGPU, meshObj, electrodesObj } from './helpers/helper';
 import { LightInputsInterface } from './helpers/mysettings';
 import { initGUI4UniqueCellModel, manageDataFromGUI, cellObj, blockGraphsGuiParams} from './helpers/manageCellModelGUI';
@@ -211,9 +211,9 @@ $('#btn-simulate').on('click', async ()=>{
         ensightWriter = await EnsightWriter.create(saveName + '_geometry.geo', saveName + '_animation.case', saveName + '_state');
     }
 
-    const meshData:meshObj = await getMeshData();
+    const meshData:meshObj             = await getMeshData();
     const electrodesData:electrodesObj = await getElectrodesData();
-    const cellObj:cellObj  = await manageDataFromGUI(gui, "Tissue");
+    const cellObj:cellObj              = await manageDataFromGUI(gui, "Tissue");
     blockGraphsGuiParams(guiCellVarGraph, guiPECGGraph);
 
     if (meshData.elementType == "line") {
@@ -221,10 +221,10 @@ $('#btn-simulate').on('click', async ()=>{
         SimLineMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph)
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
-        // SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter);
+        SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
-        // SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter)
+        SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter)
     }else{
         console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }

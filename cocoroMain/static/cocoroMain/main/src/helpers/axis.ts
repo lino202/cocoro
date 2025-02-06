@@ -7,7 +7,6 @@ export const initCanvas = (canvas: HTMLCanvasElement): CanvasRenderingContext2D 
   canvas.width = canvas.clientWidth * devicePixelRatio;
   canvas.height = canvas.clientHeight * devicePixelRatio;
 
-
   const ctx2d = canvas.getContext("2d") as unknown as CanvasRenderingContext2D;
   if (ctx2d) {
     ctx2d.font = "14px Courier New";

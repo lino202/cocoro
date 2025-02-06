@@ -303,7 +303,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
     let readDebugBuffer: GPUBuffer;
     if (debugStart >= 0) {
         if (!(debugStateName in cellObj.states)) {
-            throw new Error(`Debug state name "${debugStateName}" is not a valid state in cellObj.states`);
+            throw new Error(`Debug state name "${debugStateName}" is not a valid state for ${cellObj.cellModel} cell model`);
         }
 
         debugBuffer = device.createBuffer({
@@ -409,7 +409,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             integBuffer,
             0,
             new Float32Array([
-              integ.simulate ? integ.dt : 0.0,
+              integ.simulate ? integ.dt : 0.0, // I think this is not necessary
               integ.dx  
             ])
         );

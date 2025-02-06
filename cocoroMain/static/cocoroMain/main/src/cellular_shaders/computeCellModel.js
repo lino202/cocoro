@@ -2,7 +2,7 @@ import { commonStructs, commonCellModelDefinitions } from './common.js';
 import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from './fenton_karma_wgsl.js'
 import { gaurDefinitions, gaurCoreCompute} from './gaur_wgsl.js'
 
-export function computeCellModel(cellModel, workgroup_size) {
+export function computeCellModel(cellModel, workgroup_size, saveStart, debugStart, debugStateName, varName) {
 
     var specificDefinitions;
     var specificComputeCore;
@@ -16,12 +16,33 @@ export function computeCellModel(cellModel, workgroup_size) {
         throw new Error(`Unknown Cell Model "${cellModel}"`)
     }
 
+    // Manage save and debug buffers/arrays
+    var saveBufferDefinition = ``;
+    var saveBufferAction = ``;
+    if (saveStart >= 0){
+        saveBufferDefinition = `@binding(7) @group(0) var<storage, read_write> save_value : f32;`;
+        saveBufferAction = `save_value = states.vm;`;
+    }
+    var debugBufferDefinition = ``;
+    var debugBufferAction = ``;
+    if (debugStart >= 0){
+        if (saveStart >= 0){
+            debugBufferDefinition = `@binding(8) @group(0) var<storage, read_write> debug_value : f32;`;
+        }else{
+            debugBufferDefinition = `@binding(7) @group(0) var<storage, read_write> debug_value : f32;`;
+        }
+        debugBufferAction = `debug_value = states.` + debugStateName + `;`;
+    }
+
     return /*wgsl*/`
         ${commonStructs}
 
         ${specificDefinitions}
 
         ${commonCellModelDefinitions}
+
+        ${saveBufferDefinition}
+        ${debugBufferDefinition}
 
         @compute @workgroup_size(${workgroup_size})
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -32,9 +53,7 @@ export function computeCellModel(cellModel, workgroup_size) {
 
             // Vois not in the right tip of the line should just switch the value
             if (idx <= (arrayLength(&vois)-2)) {
-                // vois[idx] = f32(atomicLoad(&quantized_vm[idx+1])) * DEQUANTIZE_FACTOR;
-                // atomicStore(&quantized_vm[idx], i32(vois[idx] * QUANTIZE_FACTOR));
-                vois[idx] = vois[idx+1];
+                vois[idx] = vois_copy[idx+1];
                 return;    
             }
             
@@ -59,16 +78,15 @@ export function computeCellModel(cellModel, workgroup_size) {
             }
 
             // Pass to vois and normalize to plot
-            vois[idx] = states.vm;
+            vois[idx] = states.${varName};
+            ${saveBufferAction}
+            ${debugBufferAction}
 
             if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
-                vois[idx] = ((vois[idx] - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min)) * 2 - 1;
+                vois[idx] = ((vois[idx] - visual_params.min) / (visual_params.max - visual_params.min)) * 2 - 1;
             }else{
                 vois[idx] = 1.0; //Plot a line in the top if this overflows
             }
-            // results[idx] = vois[idx];
-
-            // atomicStore(&quantized_vm[idx], i32(vois[idx] * QUANTIZE_FACTOR));
         }
 
     `;

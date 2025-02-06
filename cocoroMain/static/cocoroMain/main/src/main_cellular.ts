@@ -10,8 +10,8 @@ import $ from 'jquery';
 const visualParams = {
     min   : -100,
     max   : 60,
-    plot_dt  : 1,     // This should be in ms if dt is in ms
-    num_points : 3000
+    plot_dt  : 0.2,     // This should be in ms if dt is in ms
+    num_points : 10000,
 }
 const gpuSettings = {
     workgroup_size   : 64,
@@ -29,10 +29,7 @@ const debugSettings = {
     state_name : 'vm',
 }
 
-
 const gui = new GUI();
-
-
 
 // Main ----------------
 (async () =>{

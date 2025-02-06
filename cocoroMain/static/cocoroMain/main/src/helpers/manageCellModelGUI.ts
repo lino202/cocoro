@@ -101,10 +101,9 @@ export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,numbe
 
     //Dat.gui definition
     const gpuSettingsGUIFolder = gui.addFolder('gpuSettings');
-    const visualGUIFolder      = gui.addFolder('Visualization');
     const simGUIFolder         = gui.addFolder('IonicParams');
+
     Object.keys(gpuSettings).forEach((k) => {gpuSettingsGUIFolder.add(gpuSettings, k);});
-    Object.keys(visualParams).forEach((k) => {visualGUIFolder.add(visualParams, k);});
     simGUIFolder.add(cellModelsGui, 'Cell_Model', ['Fenton_Karma','Gaur'] ).onChange(function(newValue){
         changeCellModel(newValue, gui, simScale);
     });
@@ -114,9 +113,19 @@ export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,numbe
     const constantsFolder = simGUIFolder.addFolder('Constants');
     Object.keys(cellModelParamsFKBR.constants).forEach((k) => {constantsFolder.add(cellModelParamsFKBR.constants, k);});
 
+    const visualGUIFolder      = gui.addFolder('Visualization');
     if (simScale == "Cellular"){
         var stimFolder:GUI = simGUIFolder.addFolder('Stim');
         Object.keys(cellModelParamsFKBR.stim).forEach((k) => {stimFolder.add(cellModelParamsFKBR.stim, k);});
+
+        // Stupid thing having state variable to be selected in the plot of cell sim
+        // because visualParams do not admit string:string as the code is done now
+        // we need to change this when we make the code OOP
+        var visualParamsWithVarName = { ...visualParams, var_name: 'vm' }
+        Object.keys(visualParamsWithVarName).forEach((k) => {visualGUIFolder.add(visualParamsWithVarName, k);});
+    }else{
+        Object.keys(visualParams).forEach((k) => {visualGUIFolder.add(visualParams, k);});
+
     }
 
     const saveGUIFolder = gui.addFolder('Save');
