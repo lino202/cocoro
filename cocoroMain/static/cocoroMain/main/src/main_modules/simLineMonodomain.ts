@@ -2,7 +2,7 @@ import { createTransforms, createViewProjection, meshObj, electrodesObj} from '.
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
-import { computeShaderMonodomainLine } from '../tissue_shaders/simLineMonodomainShader.js';
+import { computeShaderMonodomainLine } from '../tissue_shaders/simLineMonodomainShader';
 import EnsightWriter from '../io/ensightWriter';
 import GraphsRenderer from '../graphs/GraphsRenderer';
 import { mat4, vec3 } from 'gl-matrix';
@@ -11,14 +11,19 @@ import Stats from "stats.js";
 
 const createCamera =require('3d-view-controls')
 
-
-// This simulates line without Light as it is not neccessary
-// Voi refers to Variable of interest
 export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesData:electrodesObj, cellObj:cellObj, ensightWriter:EnsightWriter|undefined, guiCellVarGraph:GUI, guiPECGGraph:GUI) => {
     
+    // NOTES:
+    // For now saving and debugging are constrainly defined before setting the sim 
+    // as the compute shader should already have the defined buffers and so on
+    // so it seems this will be it
+    // This simulates line without Light as it is not neccessary
+    // TODO ATTENTION Vm needs to be in states for debugging,
+    // The camera freezes when integ.simulate is off maybe you would like to move it but we will have to update camera varialbles
+    // write buffers and send render
+
     console.log("RENDERING AND SIMULATING LINE");
-    console.log("SIMULATING CELL MODEL:");
-    console.log(cellObj.cellModel)
+    console.log(`SIMULATING CELL MODEL: ${cellObj.cellModel}`);
     
     var stats = new Stats();
     stats.dom.style.cssText = 'position:fixed;bottom:0;right:0;cursor:pointer;opacity:0.9;z-index:10000';
@@ -44,32 +49,26 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             integFolder.add(integ, k);
         } 
     });
-
+    
     // Get the values from the GUI 
-    var plot_dt = gui.__folders.Visualization.__controllers[2].getValue();
+    var plot_dt        = gui.__folders.Visualization.__controllers[2].getValue();
     var workgroup_size = gui.__folders.gpuSettings.__controllers[0].getValue();
-    // For now saving and debugging are constrainly defined before setting the sim 
-    // as the compute shader should already have the defined buffers and so on
-    // so it seems this will be it
-    var saveStart = gui.__folders.Save.__controllers[0].getValue();
-    var saveEnd = gui.__folders.Save.__controllers[1].getValue();
-    var debugStart = gui.__folders.Debug.__controllers[0].getValue();
-    var debugEnd = gui.__folders.Debug.__controllers[1].getValue();
+    var saveStart      = gui.__folders.Save.__controllers[0].getValue();
+    var saveEnd        = gui.__folders.Save.__controllers[1].getValue();
+    var debugStart     = gui.__folders.Debug.__controllers[0].getValue();
+    var debugEnd       = gui.__folders.Debug.__controllers[1].getValue();
     var debugStateName = gui.__folders.Debug.__controllers[2].getValue();
 
-    // create buffers
-    const numberOfIndexes  = meshData.render_elems.length;
-    const numberOfVertices = Math.trunc(meshData.vertexs.length / 3);
-    const stimParamsNum    = Math.trunc(meshData.stim_params.length / numberOfVertices);
-    const voiInitValues    = new Float32Array(numberOfVertices);
-    voiInitValues.fill(cellObj.states.vm)
-
+    // Create arrays and buffers
+    const numberOfIndexes   = meshData.render_elems.length;
+    const numberOfVertices  = Math.trunc(meshData.vertexs.length / 3);
+    const stimParamsNum     = Math.trunc(meshData.stim_params.length / numberOfVertices);
+    const vmArray           = new Float32Array(numberOfVertices).fill(cellObj.states.vm);
     const statesArray       = repeatFloat32Array(new Float32Array(Object.values(cellObj.states)),numberOfVertices)
     const constantsArray    = new Float32Array(Object.values(cellObj.constants))
     const integrationArray  = new Float32Array([integ.dt, integ.dx])
     const visualParamsArray = new Float32Array([gui.__folders.Visualization.__controllers[0].getValue(), 
-                                                gui.__folders.Visualization.__controllers[1].getValue(), 
-                                                gui.__folders.Visualization.__controllers[2].getValue()]
+                                                gui.__folders.Visualization.__controllers[1].getValue()]
     );
 
     const statesBuffer = device.createBuffer({
@@ -88,11 +87,16 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
+    const vertexRenderBuffer = device.createBuffer({
+        size: 192,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
 
     const vertexBuffer = createGPUBuffer(device, meshData.vertexs);
     const normalBuffer = createGPUBuffer(device, meshData.normals);
     const indexBuffer  = createGPUBufferUint(device, meshData.render_elems);
-    const voiBuffer    = createGPUBuffer(device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE);
+    const vmBuffer     = createGPUBuffer(device, vmArray, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+    const vmBufferCopy = createGPUBuffer(device, vmArray, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
     const stimBuffer   = createGPUBuffer(device, meshData.stim_params, GPUBufferUsage.STORAGE); //Check this Storage TODO
 
     // RENDER PIPELINE ---------------------------------------------------
@@ -130,7 +134,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
                     arrayStride: Float32Array.BYTES_PER_ELEMENT,
                     attributes: [
                         {
-                            //Vertex VoI shared with compute shader
+                            //Vertex Vm shared with compute shader
                             shaderLocation: 2,
                             format: "float32",
                             offset: 0
@@ -173,11 +177,6 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
     let rotation = vec3.fromValues(0, 0, 0);       
     var camera = createCamera(gpu.canvas, vp.cameraOption);
 
-    const vertexRenderBuffer = device.createBuffer({
-        size: 192,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-    });
-
     const renderBindGroup = device.createBindGroup({
         layout: renderPipeline.getBindGroupLayout(0),
         entries: [
@@ -188,7 +187,15 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
                     offset: 0,
                     size: 192
                 }
-            }        
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: visualParamsBuffer,
+                    offset: 0,
+                    size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length
+                }
+            }
         ]
     });
 
@@ -220,7 +227,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         {
             binding: 0,
             resource: {
-                buffer: voiBuffer,
+                buffer: vmBuffer,
                 offset: 0,
                 size: Float32Array.BYTES_PER_ELEMENT * numberOfVertices,
             },
@@ -260,9 +267,9 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         {
             binding: 5,
             resource: {
-                buffer: visualParamsBuffer,
+                buffer: vmBufferCopy,
                 offset: 0,
-                size: Float32Array.BYTES_PER_ELEMENT * visualParamsArray.length,
+                size: Float32Array.BYTES_PER_ELEMENT * vmArray.length,
             },
         },
     ];
@@ -341,18 +348,6 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         entries: computeBindGroupEntries,
     });
 
-    //Update Visualization Params, we block this as the cell side should block it 
-    // as we do not change the ylabel in cell part TODO
-    device.queue.writeBuffer(
-        visualParamsBuffer,
-        0,
-        new Float32Array([
-            gui.__folders.Visualization.__controllers[0].getValue(),   
-            gui.__folders.Visualization.__controllers[1].getValue(),
-            gui.__folders.Visualization.__controllers[2].getValue()
-        ])
-    );
-
     device.queue.writeBuffer(
         statesBuffer,
         0,
@@ -364,10 +359,46 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
     async function draw() {
 
         stats.begin();
+
+        // Update camera
+        if(camera.tick()){  
+            const pMatrix = vp.projectionMatrix;
+            vMatrix = camera.matrix;
+            mat4.multiply(vpMatrix, pMatrix, vMatrix);
+            device.queue.writeBuffer(vertexRenderBuffer, 0, vpMatrix as ArrayBuffer);
+        
+            createTransforms(modelMatrix,[0,0,0], rotation);
+            mat4.invert(normalMatrix, modelMatrix);
+            mat4.transpose(normalMatrix, normalMatrix);
+            device.queue.writeBuffer(vertexRenderBuffer, 64, modelMatrix as ArrayBuffer);
+            device.queue.writeBuffer(vertexRenderBuffer, 128, normalMatrix as ArrayBuffer);
+        }
+
+        if (!integ.simulate) {
+
+            // We render the for getting the camera changes
+            const commandEncoder = device.createCommandEncoder();
+            textureView = gpu.context.getCurrentTexture().createView();
+            renderPassDescription.colorAttachments[0].view = textureView;
+            const passEncoder = commandEncoder.beginRenderPass(renderPassDescription as GPURenderPassDescriptor);
+            passEncoder.setPipeline(renderPipeline);
+            passEncoder.setVertexBuffer(0, vertexBuffer);
+            passEncoder.setVertexBuffer(1, normalBuffer);
+            passEncoder.setVertexBuffer(2, vmBuffer);
+            passEncoder.setIndexBuffer(indexBuffer, 'uint32');
+            passEncoder.setBindGroup(0, renderBindGroup);
+            passEncoder.drawIndexed(numberOfIndexes);
+            passEncoder.end();
+
+            const gpuCommands = commandEncoder.finish();
+            device.queue.submit([gpuCommands]);
+
+            stats.end();
+            requestAnimationFrame(draw); // Keep looping but do nothing
+            return;
+        }
         
         //Update Params
-        if (integ.simulate){integ.simulation_time += plot_dt;}
-
         device.queue.writeBuffer(
             constantsBuffer,
             0,
@@ -383,50 +414,49 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             ])
         );
 
-        // Update camera
-        if(camera.tick()){  
-            const pMatrix = vp.projectionMatrix;
-            vMatrix = camera.matrix;
-            mat4.multiply(vpMatrix, pMatrix, vMatrix);
-            device.queue.writeBuffer(vertexRenderBuffer, 0, vpMatrix as ArrayBuffer);
-        
-            createTransforms(modelMatrix,[0,0,0], rotation);
-            mat4.invert(normalMatrix, modelMatrix);
-            mat4.transpose(normalMatrix, normalMatrix);
-            device.queue.writeBuffer(vertexRenderBuffer, 64, modelMatrix as ArrayBuffer);
-            device.queue.writeBuffer(vertexRenderBuffer, 128, normalMatrix as ArrayBuffer);
-        }
+        device.queue.writeBuffer(
+            visualParamsBuffer,
+            0,
+            new Float32Array([
+                gui.__folders.Visualization.__controllers[0].getValue(),   
+                gui.__folders.Visualization.__controllers[1].getValue()
+            ])
+        );
                     
-        //Generate the command encoder for both pipelines (Render and Compute)
-        //and send them to the gpu
+        // Create commandEncoder and add compute and render guidelines
+        const iterations_per_plotdt = Math.ceil(plot_dt/integ.dt); //integ.dt might change
         const commandEncoder = device.createCommandEncoder();
-        {   //Compute Update
+
+        // Several Compute Updates
+        for(let i=0; i<iterations_per_plotdt; i++){
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(computePipeline);
             passEncoder.setBindGroup(0, computeBindGroup);
             passEncoder.dispatchWorkgroups(Math.ceil(numberOfVertices / workgroup_size));
             passEncoder.end();
+            commandEncoder.copyBufferToBuffer(vmBuffer, 0, vmBufferCopy, 0, vmArray.byteLength);  // This avoids data race 
         }
-        {   //Render Update
+        // One render update
+        {
             textureView = gpu.context.getCurrentTexture().createView();
             renderPassDescription.colorAttachments[0].view = textureView;
-            
             const passEncoder = commandEncoder.beginRenderPass(renderPassDescription as GPURenderPassDescriptor);
             passEncoder.setPipeline(renderPipeline);
             passEncoder.setVertexBuffer(0, vertexBuffer);
             passEncoder.setVertexBuffer(1, normalBuffer);
-            passEncoder.setVertexBuffer(2, voiBuffer);
+            passEncoder.setVertexBuffer(2, vmBuffer);
             passEncoder.setIndexBuffer(indexBuffer, 'uint32');
             passEncoder.setBindGroup(0, renderBindGroup);
             passEncoder.drawIndexed(numberOfIndexes);
             passEncoder.end();
         }
+
         // Add render pass for possible new canvases
         if (graphsRenderer.isActivated) {
             graphsRenderer.render(commandEncoder)
         }
 
-        // Save or debug - Copying buffer to buffer.
+        // Save or debug - Copying buffer to buffer
         if (integ.simulation_time >= saveStart && stepsCount <= totalStepsToSave-1 && integ.simulate && ensightWriter != undefined) {
             readSaveBuffer = device.createBuffer({
                 label: 'Read Save Buffer',
@@ -444,22 +474,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             commandEncoder.copyBufferToBuffer(debugBuffer, 0, readDebugBuffer, 0, nodeResultsSize);
         }
 
-        // Debug delete after---------------------------------------
-        var TEMPORALSIZE:number|undefined;
-        var TEMPORALGETBuffer:GPUBuffer|undefined = undefined;
-        if (graphsRenderer.pECGGraph != undefined){
-            TEMPORALSIZE = Float32Array.BYTES_PER_ELEMENT * graphsRenderer.pECGGraph.nNodes;
-            TEMPORALGETBuffer = device.createBuffer({
-                label: 'TEMPORALGETBuffer',
-                size: TEMPORALSIZE,
-                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-            });
-            commandEncoder.copyBufferToBuffer(graphsRenderer.pECGGraph.TEMPORALSETBUFFER, 0, TEMPORALGETBuffer, 0, TEMPORALSIZE);
-
-        }
-
-
-        // Submit GPU commands.
+        // Submit GPU commands
         const gpuCommands = commandEncoder.finish();
         device.queue.submit([gpuCommands]);
 
@@ -497,18 +512,10 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             console.log(new Float32Array(arrayBuffer));
         }
 
-        // if(TEMPORALGETBuffer!=undefined){
-        //     await TEMPORALGETBuffer.mapAsync(GPUMapMode.READ);
-        //     const arrayBuffer = TEMPORALGETBuffer.getMappedRange();
-        //     console.log(integ.simulation_time)
-        //     console.log(new Float32Array(arrayBuffer));
-        // }
-
+        integ.simulation_time += integ.dt * iterations_per_plotdt;
         
         stats.end();
-
         requestAnimationFrame(draw);
-
     }
 
     requestAnimationFrame(draw)

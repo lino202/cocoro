@@ -138,9 +138,11 @@ export function manageDataFromGUI(gui: GUI, simScale:string="Cellular"): cellObj
     // Disable things (visualization and cell model name and type)
     const visControllers = gui.__folders.Visualization.__controllers;
     for (let i=0; i<visControllers.length; i++){
-        var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = visControllers[i].domElement.querySelector('input');
-        if (controllerDomElement != null){
-            controllerDomElement.disabled = true;
+        if ((visControllers[i].property != 'min') && (visControllers[i].property != 'max')){
+            var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = visControllers[i].domElement.querySelector('input');
+            if (controllerDomElement != null){
+                controllerDomElement.disabled = true;
+            }
         }
     }
     var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = cellModelController.domElement.querySelector('select');

@@ -22,8 +22,14 @@ export function commonVertFragShaders(elemType) {
             modelMatrix          : mat4x4<f32>,               
             normalMatrix         : mat4x4<f32>,            
         };
-        @binding(0) @group(0) var<uniform> vertex_uniforms : VertexUniforms;
 
+        struct VisualParams {
+            min : f32,
+            max : f32,   
+        };
+
+        @binding(0) @group(0) var<uniform> vertex_uniforms : VertexUniforms;
+        @binding(1) @group(0) var<uniform> visual_params : VisualParams;
 
         struct Output { // This is different from input buffers in createRenderPipeline
             @builtin(position) Position : vec4<f32>,
@@ -33,16 +39,19 @@ export function commonVertFragShaders(elemType) {
         };
 
         @vertex
-        fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>, @location(2) voi: f32) -> Output {    
+        fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>, @location(2) vm: f32) -> Output {    
             var output: Output;            
             let mPosition:vec4<f32> = vertex_uniforms.modelMatrix * position; 
             output.vPosition = mPosition;                  
             output.vNormal =  vertex_uniforms.normalMatrix * normal;
             output.Position = vertex_uniforms.viewProjectionMatrix * mPosition;
 
-            //Get vertex color based on normalized VoI computed in compute shader
-            if ((voi <= 1.0) & (voi >= 0.0)){               
-                output.vColor = color_map_turbo(voi); 
+            // Convert to user selected range the vm value obtained form the compute shader
+            var norm_vm:f32 = (vm - visual_params.min) / (visual_params.max - visual_params.min);
+
+            //Get vertex color based on normalized vm
+            if ((norm_vm <= 1.0) & (norm_vm >= 0.0)){               
+                output.vColor = color_map_turbo(norm_vm); 
             }else{
                 output.vColor = vec3<f32>(1.,0.,1.); //Plot in magenta out of range, nan or inf
             }

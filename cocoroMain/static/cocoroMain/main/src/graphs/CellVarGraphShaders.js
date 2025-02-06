@@ -20,8 +20,8 @@ export function renderCellVarGraphComputeShader(cellModel, nNodes, nVertexs, var
         ${specificDefinitions}
 
         struct VisualParams {
-            voi_min : f32,
-            voi_max : f32       
+            min : f32,
+            max : f32       
         };
 
         @binding(0) @group(0) var<storage, read_write> vois : array<f32>; //nVertexs here gives error with function ArrayLength -> it produces no constructor match
@@ -44,7 +44,7 @@ export function renderCellVarGraphComputeShader(cellModel, nNodes, nVertexs, var
             
             // Pass to vois and normalize to plot
             if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
-                vois[idx] = ((states[node_idx].${varName} - visualization.voi_min) / (visualization.voi_max - visualization.voi_min)) * 2 - 1;
+                vois[idx] = ((states[node_idx].${varName} - visualization.min) / (visualization.max - visualization.min)) * 2 - 1;
             }else{
                 vois[idx] = 1.0; //Plot a line in the top if this overflows
             }

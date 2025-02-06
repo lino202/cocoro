@@ -1,4 +1,4 @@
-import { SimLineMonodomain} from './main_modules/simLineMonodomain';
+import { SimLineMonodomain } from './main_modules/simLineMonodomain'
 import { SimQuadMonodomain} from './main_modules/SimQuadMonodomain';
 import { SimHexaMonodomain} from './main_modules/SimHexaMonodomain';
 import { checkWebGPU, meshObj, electrodesObj } from './helpers/helper';
@@ -14,8 +14,8 @@ import EnsightWriter from './io/ensightWriter';
 let li:LightInputsInterface = {};
 
 const visualParams = {
-    voiMax   : 60,
-    voiMin   : -100,
+    min   : -100,
+    max   : 60,
     plot_dt  : 0.2,     // This should be in ms if dt is in ms
     // num_points : 3000
 }
@@ -179,6 +179,7 @@ $(document).ready(function(){
 // TODO add CS
 // TODO show stim regions on gui and made available the modification of those parameters
 // TODO stim with click
+// TODO Is strange but for the FentonKarma model we get extra negative (under MDP) Vm in the extremes
 // see secondary TODOs around in code
 
 
@@ -220,10 +221,10 @@ $('#btn-simulate').on('click', async ()=>{
         SimLineMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph)
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
-        SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter);
+        // SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
-        SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter)
+        // SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter)
     }else{
         console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }

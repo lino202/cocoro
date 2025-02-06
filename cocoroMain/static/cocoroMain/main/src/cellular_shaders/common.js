@@ -11,8 +11,8 @@ export const commonStructs = /*wgsl*/`
   }
 
   struct VisualParams {
-    voi_max : f32,
-    voi_min : f32,
+    min : f32,
+    max : f32,
     plot_dt : f32,
     num_points : i32       
   }

@@ -8,8 +8,8 @@ import $ from 'jquery';
 
 //  Global Variables ------------
 const visualParams = {
-    voiMax   : 60,
-    voiMin   : -100,
+    min   : -100,
+    max   : 60,
     plot_dt  : 1,     // This should be in ms if dt is in ms
     num_points : 3000
 }
