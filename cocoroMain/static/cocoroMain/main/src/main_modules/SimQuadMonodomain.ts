@@ -411,6 +411,16 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             device.queue.writeBuffer(vertexRenderBuffer, 128, normalMatrix as ArrayBuffer);
         }
 
+        // This should be done here to change colors shown on pause
+        device.queue.writeBuffer(
+            visualParamsBuffer,
+            0,
+            new Float32Array([
+                gui.__folders.Visualization.__controllers[0].getValue(),   
+                gui.__folders.Visualization.__controllers[1].getValue()
+            ])
+        );
+
         if (!integ.simulate) {
 
             // We render the for getting the camera changes
@@ -455,15 +465,6 @@ export const SimQuadMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             new Float32Array([
               integ.simulate ? integ.dt : 0.0,
               integ.dx  
-            ])
-        );
-
-        device.queue.writeBuffer(
-            visualParamsBuffer,
-            0,
-            new Float32Array([
-                gui.__folders.Visualization.__controllers[0].getValue(),   
-                gui.__folders.Visualization.__controllers[1].getValue()
             ])
         );
                     

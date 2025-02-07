@@ -4,7 +4,7 @@ export function hexa_d2dydz_V(nNodes){
 
         if ( (_i_j1_k1 < ${nNodes}) & (_i_1j_k1 < ${nNodes}) & (_i_j1_1k < ${nNodes}) & (_i_1j_1k < ${nNodes})) {
             // central, if all are available we are in plane so neumann condition not necessary there
-            d2dydz_V = (states[_i_j1_k1].vm - states[_i_1j_k1].vm - states[_i_j1_1k].vm + states[_i_1j_1k].vm ) / (4 * pow(integ.dx, 2));
+            d2dydz_V = (vms_copy[_i_j1_k1] - vms_copy[_i_1j_k1] - vms_copy[_i_j1_1k] + vms_copy[_i_1j_1k] ) / (4 * pow(integ.dx, 2));
         
         // Now we have 12 cases (4 corners defining the derivative that can or can not be present 
         // So 2^4 = 16 but 4 cases are not possible, all present, none present, just two diagonals present) TODO check implementation

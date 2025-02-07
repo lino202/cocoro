@@ -24,12 +24,12 @@ export function getSecondDerivativesHexa(nNodes){
             (_1i_j1_1k < ${nNodes})) {
 
             // here I am in the center of domain
-            d2dxdx_V = (states[_1i_j_k].vm - 2 * states[idx].vm + states[_i1_j_k].vm) / pow(integ.dx,2);
-            d2dydy_V = (states[_i_1j_k].vm - 2 * states[idx].vm + states[_i_j1_k].vm) / pow(integ.dx,2);
-            d2dzdz_V = (states[_i_j_1k].vm - 2 * states[idx].vm + states[_i_j_k1].vm) / pow(integ.dx,2);
-            d2dxdy_V = (states[_i1_j1_k].vm - states[_1i_j1_k].vm - states[_i1_1j_k].vm + states[_1i_1j_k].vm ) / (4 * pow(integ.dx, 2));
-            d2dxdz_V = (states[_i1_j_k1].vm - states[_1i_j_k1].vm - states[_i1_j_1k].vm + states[_1i_j_1k].vm ) / (4 * pow(integ.dx, 2));
-            d2dydz_V = (states[_i_j1_k1].vm - states[_i_1j_k1].vm - states[_i_j1_1k].vm + states[_i_1j_1k].vm ) / (4 * pow(integ.dx, 2));
+            d2dxdx_V = (vms_copy[_1i_j_k] - 2 * vms_copy[idx] + vms_copy[_i1_j_k]) / pow(integ.dx,2);
+            d2dydy_V = (vms_copy[_i_1j_k] - 2 * vms_copy[idx] + vms_copy[_i_j1_k]) / pow(integ.dx,2);
+            d2dzdz_V = (vms_copy[_i_j_1k] - 2 * vms_copy[idx] + vms_copy[_i_j_k1]) / pow(integ.dx,2);
+            d2dxdy_V = (vms_copy[_i1_j1_k] - vms_copy[_1i_j1_k] - vms_copy[_i1_1j_k] + vms_copy[_1i_1j_k] ) / (4 * pow(integ.dx, 2));
+            d2dxdz_V = (vms_copy[_i1_j_k1] - vms_copy[_1i_j_k1] - vms_copy[_i1_j_1k] + vms_copy[_1i_j_1k] ) / (4 * pow(integ.dx, 2));
+            d2dydz_V = (vms_copy[_i_j1_k1] - vms_copy[_i_1j_k1] - vms_copy[_i_j1_1k] + vms_copy[_i_1j_1k] ) / (4 * pow(integ.dx, 2));
 
         
         }else{

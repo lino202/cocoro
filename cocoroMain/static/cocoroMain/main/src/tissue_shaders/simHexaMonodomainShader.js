@@ -2,7 +2,7 @@ import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shad
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
 import { getSecondDerivativesHexa } from './getSecondDerivativesHexa.js';
 
-export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, saveStart, debugStart, debugStateName){
+export function computeShaderMonodomainHexa(cellModel, nNodes, nVertexs, workgroup_size, saveStart, debugStart, debugStateName){
 
     var specificDefinitions;
     var specificComputeCore;
@@ -22,16 +22,16 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, s
     var saveBufferDefinition = ``;
     var saveBufferAction = ``;
     if (saveStart >= 0){
-        saveBufferDefinition = `@binding(9) @group(0) var<storage, read_write> save_array : array<f32>;`;
+        saveBufferDefinition = `@binding(10) @group(0) var<storage, read_write> save_array : array<f32>;`;
         saveBufferAction = `save_array[idx] = states[idx].vm;`;
     }
     var debugBufferDefinition = ``;
     var debugBufferAction = ``;
     if (debugStart >= 0){
         if (saveStart >= 0){
-            debugBufferDefinition = `@binding(10) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+            debugBufferDefinition = `@binding(11) @group(0) var<storage, read_write> debug_array : array<f32>;`;
         }else{
-            debugBufferDefinition = `@binding(9) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+            debugBufferDefinition = `@binding(10) @group(0) var<storage, read_write> debug_array : array<f32>;`;
         }
         debugBufferAction = `debug_array[idx] = states[idx].` + debugStateName + `;`;
     }
@@ -50,12 +50,6 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, s
             dur: f32,
             start: f32
         }
-
-        struct VisualParams {
-            voi_max : f32,
-            voi_min : f32,
-            plot_dt : f32,        
-        };
 
         struct FiberOrientation {
             long_x : f32,
@@ -95,19 +89,18 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, s
 
         ${specificDefinitions}
 
-        @binding(0) @group(0) var<storage, read_write> vois          : array<f32>;
-        @binding(1) @group(0) var<storage, read>       stim          : array<Stim, ${nNodes}>;
-        @binding(2) @group(0) var<storage, read_write> states        : array<States, ${nNodes}>;
-        @binding(3) @group(0) var<storage, read>       fibers_orient : array<FiberOrientation, ${nNodes}>;
-        @binding(4) @group(0) var<storage, read>       connections   : array<Connections, ${nNodes}>;
-        @binding(5) @group(0) var<uniform>             constants     : Constants;
-        @binding(6) @group(0) var<uniform>             integ         : Integration;
-        @binding(7) @group(0) var<uniform>             visual_params : VisualParams;
-        @binding(8) @group(0) var<storage, read>       render_points : array<u32>;
+        @binding(0) @group(0) var<storage, read_write> vms           : array<f32, ${nNodes}>;
+        @binding(1) @group(0) var<storage, read>       vms_copy      : array<f32, ${nNodes}>;
+        @binding(2) @group(0) var<storage, read_write> vms_vertexs   : array<f32, ${nVertexs}>;
+        @binding(3) @group(0) var<storage, read>       stim          : array<Stim, ${nNodes}>;
+        @binding(4) @group(0) var<storage, read_write> states        : array<States, ${nNodes}>;
+        @binding(5) @group(0) var<storage, read>       fibers_orient : array<FiberOrientation, ${nNodes}>;
+        @binding(6) @group(0) var<storage, read>       connections   : array<Connections, ${nNodes}>;
+        @binding(7) @group(0) var<uniform>             constants     : Constants;
+        @binding(8) @group(0) var<uniform>             integ         : Integration;
+        @binding(9) @group(0) var<storage, read>       render_points : array<u32>;
         ${saveBufferDefinition}
         ${debugBufferDefinition}
-
-        var<private> current_compute_interval: f32;
 
         @compute @workgroup_size(${workgroup_size})
         fn comp_monodomain_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -117,8 +110,8 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, s
             if((idx >= ${nNodes}) | (integ.dt <= 0.)) {return;}
 
             // Get the G tensor
-            // This is done out of the loop as the values are always equal in the loop, they only can change from outside
-            // by writing the buffer but in that case this code will be rerun
+            // Maybe this should be done outside the for in the draw function as this is required once per plot_dt
+            // interval but it does not matter if done here, the burden do not seem high 
             var sigma_trans:f32 = constants.sigma_long * constants.sigma_trans_2_long;
             var sigma_xx:f32 = (pow(fibers_orient[idx].long_x,2) * constants.sigma_long) + (pow(fibers_orient[idx].long_y,2) * sigma_trans) + (pow(fibers_orient[idx].long_z,2) * sigma_trans);
             var sigma_xy:f32 = fibers_orient[idx].long_x * fibers_orient[idx].long_y * (constants.sigma_long - sigma_trans);
@@ -129,7 +122,6 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, s
             var sigma_zx:f32 = sigma_xz;
             var sigma_zy:f32 = sigma_yz;
             var sigma_zz:f32 = (pow(fibers_orient[idx].long_x,2) * sigma_trans) + (pow(fibers_orient[idx].long_y,2) * sigma_trans) + (pow(fibers_orient[idx].long_z,2) * constants.sigma_long);
-
 
             // Get the connections and init the second derivatives      
             let _i_j1_k    : u32 = connections[idx]._i_j1_k  ; 
@@ -159,6 +151,7 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, s
             let _1i_j_1k   : u32 = connections[idx]._1i_j_1k ; 
             let _1i_j1_1k  : u32 = connections[idx]._1i_j1_1k; 
 
+            // Compute the divergence of the Vm gradient
             var d2dxdx_V:f32 = 0.0;
             var d2dydy_V:f32 = 0.0; 
             var d2dzdz_V:f32 = 0.0;   
@@ -169,45 +162,35 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, workgroup_size, s
             // var d2dzdx_V:f32 = 0.0; is equal to d2dxdz_V
             // var d2dzdy_V:f32 = 0.0; is equal to d2dydz_V
             
+            ${secondDerivativesShader}
+
+            var ddx_A:f32 = d2dxdx_V * sigma_xx + d2dxdy_V * sigma_xy + d2dxdz_V * sigma_xz; 
+            var ddy_B:f32 = d2dxdy_V * sigma_yx + d2dydy_V * sigma_yy + d2dydz_V * sigma_yz;
+            var ddz_C:f32 = d2dxdz_V * sigma_zx + d2dydz_V * sigma_zy + d2dzdz_V * sigma_zz;
+            var divG_gradV:f32 = ddx_A + ddy_B + ddz_C;
+
+            // Get the stimulation current
+            var i_stim:f32 = 0.0;
+            if ((states[idx].t >= stim[idx].start) & (states[idx].t < stim[idx].start+stim[idx].dur)){i_stim = -stim[idx].amp;}
+            if ((states[idx].t >= stim[idx].period+stim[idx].start) & (((states[idx].t - stim[idx].start) % stim[idx].period) < stim[idx].dur)){i_stim = -stim[idx].amp;}
             
-            current_compute_interval = trunc(states[idx].t/visual_params.plot_dt);
-            loop{
-                // TODO here the Vms might be read and not updated yet so the definition of plot_dt is really important!
-                // This issue is persistent as barriers work only in a SINGLE workgroup (neither we use storage or workgroup
-                // barrier)! 
-                ${secondDerivativesShader}
-
-                var ddx_A:f32 = d2dxdx_V * sigma_xx + d2dxdy_V * sigma_xy + d2dxdz_V * sigma_xz; 
-                var ddy_B:f32 = d2dxdy_V * sigma_yx + d2dydy_V * sigma_yy + d2dydz_V * sigma_yz;
-                var ddz_C:f32 = d2dxdz_V * sigma_zx + d2dydz_V * sigma_zy + d2dzdz_V * sigma_zz;
-                var divG_gradV:f32 = ddx_A + ddy_B + ddz_C;
-
-                // Get the stimulation current
-                var i_stim:f32 = 0.0;
-                if ((states[idx].t >= stim[idx].start) & (states[idx].t < stim[idx].start+stim[idx].dur)){i_stim = -stim[idx].amp;}
-                if ((states[idx].t >= stim[idx].period+stim[idx].start) & (((states[idx].t - stim[idx].start) % stim[idx].period) < stim[idx].dur)){i_stim = -stim[idx].amp;}
-                
-                // Compute reaction/ionic term by defining the curr_Iion
-                // Note: We defined Beta, Cm and the sigma_long in the constants of the cell model
-                // if we think logically those are common params to the cell type that can be defining one single cell
-                // or tissue with unique cellType. So constants are unique for all nodes but the states should be repetead for all nodes -> array
-                ${specificComputeCore}
-                
-                // Get new Vm value
-                states[idx].vm += ((((divG_gradV*100000)/(constants.beta*constants.cm)) - ((curr_Iion+i_stim)/constants.cm)) * integ.dt);
-                states[idx].t += integ.dt;
-                
-                if ( trunc(states[idx].t/visual_params.plot_dt) != current_compute_interval) {break;}
-
-            }
+            // Compute reaction/ionic term by defining the curr_Iion
+            // Note: We defined Beta, Cm and the sigma_long in the constants of the cell model
+            // if we think logically those are common params to the cell type that can be defining one single cell
+            // or tissue with unique cellType. So constants are unique for all nodes but the states should be repetead for all nodes -> array
+            ${specificComputeCore}
+            
+            // Get new Vm value
+            states[idx].vm += ((((divG_gradV*100000)/(constants.beta*constants.cm)) - ((curr_Iion+i_stim)/constants.cm)) * integ.dt);
+            states[idx].t += integ.dt;
             
             ${saveBufferAction}
             ${debugBufferAction}
+            vms[idx] = states[idx].vm;
 
-            //Pass to vois and normalize for plotting    
-            // If vm is out of the Voi max min range we would have a magenta color
+            // If we are in a node of the render mesh update it!
             if (render_points[idx] < ${nNodes}){
-                vois[render_points[idx]] = (states[idx].vm - visual_params.voi_min) / (visual_params.voi_max - visual_params.voi_min);
+                vms_vertexs[render_points[idx]] = states[idx].vm;
             }
 
             

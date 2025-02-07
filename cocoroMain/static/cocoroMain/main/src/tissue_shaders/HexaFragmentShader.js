@@ -6,14 +6,14 @@ export function HexaFragmentShader() {
             lightPosition : vec4<f32>,   
             eyePosition : vec4<f32>,
         };
-        @binding(1) @group(0) var<uniform> frag_uniforms : FragUniforms;
+        @binding(2) @group(0) var<uniform> frag_uniforms : FragUniforms;
 
 
         struct ColorUniforms{
             lightColor : vec4<f32>,
             specularColor : vec4<f32>,
         };
-        @binding(2) @group(0) var <uniform> color_uniforms : ColorUniforms;
+        @binding(3) @group(0) var <uniform> color_uniforms : ColorUniforms;
 
 
         struct LightUniforms{
@@ -23,7 +23,7 @@ export function HexaFragmentShader() {
             shininess : f32,
             twoSide : f32,
         };
-        @binding(3) @group(0) var <uniform> light_uniforms : LightUniforms;
+        @binding(4) @group(0) var <uniform> light_uniforms : LightUniforms;
 
 
         @fragment

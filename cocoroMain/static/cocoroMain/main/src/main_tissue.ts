@@ -224,7 +224,7 @@ $('#btn-simulate').on('click', async ()=>{
         SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
-        // SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter, guiCellVarGraph, guiPECGGraph)
+        SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter, guiCellVarGraph, guiPECGGraph)
     }else{
         console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }
