@@ -1,5 +1,5 @@
 import { renderPECGGraphFragmentShader, renderPECGGraphVertexShader } from './PECGGraphShaders';
-import { computePECGGraphShader1, computePECGGraphShader2, computePECGGraphShader3 } from './PECGGraphShaders';
+import { computePECGGraphShader1, computePECGGraphShader2, computePECGGraphShader3, computePECGGraphShader4 } from './PECGGraphShaders';
 import { createGPUBuffer, createGPUBufferUint} from '../helpers/helper';
 import { GUI } from 'dat.gui';
 import { cellObj } from '../helpers/manageCellModelGUI';
@@ -18,6 +18,7 @@ class PECGGraph {
     renderPipeline: GPURenderPipeline;
     computePipeline2: GPUComputePipeline;
     computePipeline3: GPUComputePipeline;
+    computePipeline4: GPUComputePipeline;
     renderPassDescriptor: GPURenderPassDescriptor;
     numberOfIndexes   : number;
     coordsBuffer      : GPUBuffer;
@@ -36,9 +37,11 @@ class PECGGraph {
     potentialBuffer   : GPUBuffer;
     visualParamsBuffer: GPUBuffer;
     smoothingBuffer   : GPUBuffer;
+    potentialPerNodeBuffer : GPUBuffer;
     statesBuffer: GPUBuffer | null = null;
     computeBindGroup2: GPUBindGroup | null = null;
     computeBindGroup3: GPUBindGroup;
+    computeBindGroup4: GPUBindGroup;
 
     constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:cellObj,
                 meshData:meshObj, electrodesData:electrodesObj, nNodes:number, gui:GUI, workgroupSize:number=64) {
@@ -140,7 +143,8 @@ class PECGGraph {
         // 1- is computed only once for getting grad 1/r, which is equal to - (r_vec - r'_vec) / r^3 where r is the magnitude |r_vec - r'_vec| and r_vec is 
         // lead position and r'_vec is the node position 
         // 2- for the extracellular potential on the electrode this is computed in every iteration (according to plot_dt) as Vm changes
-        // 3- the other for the computation of the 12 lead electrocardiographic potential and moving the values for rendering the graph
+        // 3- we need to then sum all values computed for each lead, this can not be done in shader 2 due to data races
+        // 4- the other for the computation of the 12 lead electrocardiographic potential and moving the values for rendering the graph
 
         // First compute shader
         const gradInvRArr  = new Float32Array(this.nNodes*this.numPotentials*3).fill(0);
@@ -163,12 +167,20 @@ class PECGGraph {
         }) as GPUBuffer;
         this.device.queue.writeBuffer(this.integBuffer, 0, integArr);
 
+        this.potentialPerNodeBuffer = this.device.createBuffer({
+            label: 'PECGGraph_potentialBuffer',
+            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.potentialPerNodeBuffer, 0, new Float32Array(this.numPotentials*this.nNodes).fill(0));
+
         // not init here as this should be cleared every iteration
         this.potentialBuffer = this.device.createBuffer({
             label: 'PECGGraph_potentialBuffer',
             size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.potentialBuffer, 0, new Float32Array(this.numPotentials).fill(0));
 
         const visualParamsArray = new Float32Array([this.min, this.max]);
         this.visualParamsBuffer = this.device.createBuffer({
@@ -208,13 +220,13 @@ class PECGGraph {
             },
         });
 
-        // console.log(computePECGGraphShader3(this.numPoints))
+        // console.log(computePECGGraphShader3(this.nNodes, this.numPotentials))
         this.computePipeline3 = this.device.createComputePipeline({
             label: 'PECGGraph_ComputePipeline3',
             layout: 'auto',
             compute: {
                 module: this.device.createShaderModule({
-                code: computePECGGraphShader3(this.numPoints)}),
+                code: computePECGGraphShader3(this.nNodes, this.numPotentials)}),
                 entryPoint: 'comp_main',
             },
         });
@@ -222,6 +234,40 @@ class PECGGraph {
         this.computeBindGroup3 = this.device.createBindGroup({
             label: 'PECGGraph_ComputeBindGroup3',
             layout: this.computePipeline3.getBindGroupLayout(0),
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: this.potentialPerNodeBuffer,
+                            offset: 0,
+                            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        resource: {
+                            buffer: this.potentialBuffer,
+                            offset: 0,
+                            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials,
+                        },
+                    }
+                ],
+        });
+
+        // console.log(computePECGGraphShader4(this.numPoints))
+        this.computePipeline4 = this.device.createComputePipeline({
+            label: 'PECGGraph_ComputePipeline4',
+            layout: 'auto',
+            compute: {
+                module: this.device.createShaderModule({
+                code: computePECGGraphShader4(this.numPoints)}),
+                entryPoint: 'comp_main',
+            },
+        });
+
+        this.computeBindGroup4 = this.device.createBindGroup({
+            label: 'PECGGraph_ComputeBindGroup4',
+            layout: this.computePipeline4.getBindGroupLayout(0),
                 entries: [
                     {
                         binding: 0,
@@ -425,9 +471,9 @@ class PECGGraph {
                         {
                             binding: 0,
                             resource: {
-                                buffer: this.potentialBuffer,
+                                buffer: this.potentialPerNodeBuffer,
                                 offset: 0,
-                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
                             },
                         },
                         {
@@ -472,9 +518,9 @@ class PECGGraph {
                         {
                             binding: 0,
                             resource: {
-                                buffer: this.potentialBuffer,
+                                buffer: this.potentialPerNodeBuffer,
                                 offset: 0,
-                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
                             },
                         },
                         {
@@ -523,9 +569,6 @@ class PECGGraph {
     }
 
     render(commandEncoder: GPUCommandEncoder){
-
-        // Init potential Buffer
-        this.device.queue.writeBuffer(this.potentialBuffer, 0, new Float32Array(this.numPotentials).fill(0));
         
         this.device.queue.writeBuffer(
             this.visualParamsBuffer,
@@ -553,6 +596,13 @@ class PECGGraph {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(this.computePipeline3);
             passEncoder.setBindGroup(0, this.computeBindGroup3);
+            passEncoder.dispatchWorkgroups(Math.ceil((this.numPotentials) / this.workgroupSize));
+            passEncoder.end();
+        }
+        {   //Compute Update
+            const passEncoder = commandEncoder.beginComputePass();
+            passEncoder.setPipeline(this.computePipeline4);
+            passEncoder.setBindGroup(0, this.computeBindGroup4);
             passEncoder.dispatchWorkgroups(Math.ceil((this.numPoints * this.numECGLeads) / this.workgroupSize));
             passEncoder.end();
         }

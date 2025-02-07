@@ -150,7 +150,7 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
             v6 : f32
         };
 
-        @binding(0) @group(0) var<storage, read_write> extracellular_potential : ElectrodesScalar;
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
         @binding(1) @group(0) var<storage, read>       states : array<States, ${nNodes}>;
         @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             dx : f32;
@@ -176,16 +176,16 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential.la += ddx_V * grad_inv_r_arr[idx].la.x * 1e10;
-            extracellular_potential.ra += ddx_V * grad_inv_r_arr[idx].ra.x * 1e10;
-            extracellular_potential.ll += ddx_V * grad_inv_r_arr[idx].ll.x * 1e10;
-            extracellular_potential.rl += ddx_V * grad_inv_r_arr[idx].rl.x * 1e10;
-            extracellular_potential.v1 += ddx_V * grad_inv_r_arr[idx].v1.x * 1e10;
-            extracellular_potential.v2 += ddx_V * grad_inv_r_arr[idx].v2.x * 1e10;
-            extracellular_potential.v3 += ddx_V * grad_inv_r_arr[idx].v3.x * 1e10;
-            extracellular_potential.v4 += ddx_V * grad_inv_r_arr[idx].v4.x * 1e10;
-            extracellular_potential.v5 += ddx_V * grad_inv_r_arr[idx].v5.x * 1e10;
-            extracellular_potential.v6 += ddx_V * grad_inv_r_arr[idx].v6.x * 1e10;
+            extracellular_potential_per_node[idx].la = ddx_V * grad_inv_r_arr[idx].la.x * 1e8;
+            extracellular_potential_per_node[idx].ra = ddx_V * grad_inv_r_arr[idx].ra.x * 1e8;
+            extracellular_potential_per_node[idx].ll = ddx_V * grad_inv_r_arr[idx].ll.x * 1e8;
+            extracellular_potential_per_node[idx].rl = ddx_V * grad_inv_r_arr[idx].rl.x * 1e8;
+            extracellular_potential_per_node[idx].v1 = ddx_V * grad_inv_r_arr[idx].v1.x * 1e8;
+            extracellular_potential_per_node[idx].v2 = ddx_V * grad_inv_r_arr[idx].v2.x * 1e8;
+            extracellular_potential_per_node[idx].v3 = ddx_V * grad_inv_r_arr[idx].v3.x * 1e8;
+            extracellular_potential_per_node[idx].v4 = ddx_V * grad_inv_r_arr[idx].v4.x * 1e8;
+            extracellular_potential_per_node[idx].v5 = ddx_V * grad_inv_r_arr[idx].v5.x * 1e8;
+            extracellular_potential_per_node[idx].v6 = ddx_V * grad_inv_r_arr[idx].v6.x * 1e8;
         }
         
     `;
@@ -240,7 +240,7 @@ function computeGradQuad(specificDefinitions, nNodes, workgroup_size){
             _1i_j1 :  u32
         };
 
-        @binding(0) @group(0) var<storage, read_write> extracellular_potential : ElectrodesScalar;
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
         @binding(1) @group(0) var<storage, read>       states         : array<States, ${nNodes}>;
         @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             dx             : f32;
@@ -296,16 +296,16 @@ function computeGradQuad(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential.la += ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y)) * 1e10;
-            extracellular_potential.ra += ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y)) * 1e10;
-            extracellular_potential.ll += ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y)) * 1e10;
-            extracellular_potential.rl += ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y)) * 1e10;
-            extracellular_potential.v1 += ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y)) * 1e10;
-            extracellular_potential.v2 += ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y)) * 1e10;
-            extracellular_potential.v3 += ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y)) * 1e10;
-            extracellular_potential.v4 += ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y)) * 1e10;
-            extracellular_potential.v5 += ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y)) * 1e10;
-            extracellular_potential.v6 += ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y)) * 1e10;
+            extracellular_potential_per_node[idx].la = ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y)) * 1e8;
+            extracellular_potential_per_node[idx].ra = ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y)) * 1e8;
+            extracellular_potential_per_node[idx].ll = ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y)) * 1e8;
+            extracellular_potential_per_node[idx].rl = ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y)) * 1e8;
+            extracellular_potential_per_node[idx].v1 = ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y)) * 1e8;
+            extracellular_potential_per_node[idx].v2 = ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y)) * 1e8;
+            extracellular_potential_per_node[idx].v3 = ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y)) * 1e8;
+            extracellular_potential_per_node[idx].v4 = ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y)) * 1e8;
+            extracellular_potential_per_node[idx].v5 = ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y)) * 1e8;
+            extracellular_potential_per_node[idx].v6 = ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y)) * 1e8;
         }
         
     `;
@@ -378,7 +378,7 @@ function computeGradHexa(specificDefinitions, nNodes, workgroup_size){
             _1i_j1_1k :  u32
         };
 
-        @binding(0) @group(0) var<storage, read_write> extracellular_potential : ElectrodesScalar;
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
         @binding(1) @group(0) var<storage, read>       states         : array<States, ${nNodes}>;
         @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             dx             : f32;
@@ -498,16 +498,16 @@ function computeGradHexa(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential.la += ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y) + (ddz_V * grad_inv_r_arr[idx].la.z)) * 1e11;
-            extracellular_potential.ra += ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y) + (ddz_V * grad_inv_r_arr[idx].ra.z)) * 1e11;
-            extracellular_potential.ll += ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y) + (ddz_V * grad_inv_r_arr[idx].ll.z)) * 1e11;
-            extracellular_potential.rl += ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y) + (ddz_V * grad_inv_r_arr[idx].rl.z)) * 1e11;
-            extracellular_potential.v1 += ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y) + (ddz_V * grad_inv_r_arr[idx].v1.z)) * 1e11;
-            extracellular_potential.v2 += ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y) + (ddz_V * grad_inv_r_arr[idx].v2.z)) * 1e11;
-            extracellular_potential.v3 += ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y) + (ddz_V * grad_inv_r_arr[idx].v3.z)) * 1e11;
-            extracellular_potential.v4 += ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y) + (ddz_V * grad_inv_r_arr[idx].v4.z)) * 1e11;
-            extracellular_potential.v5 += ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y) + (ddz_V * grad_inv_r_arr[idx].v5.z)) * 1e11;
-            extracellular_potential.v6 += ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y) + (ddz_V * grad_inv_r_arr[idx].v6.z)) * 1e11;
+            extracellular_potential_per_node[idx].la = ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y) + (ddz_V * grad_inv_r_arr[idx].la.z)) * 1e8;
+            extracellular_potential_per_node[idx].ra = ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y) + (ddz_V * grad_inv_r_arr[idx].ra.z)) * 1e8;
+            extracellular_potential_per_node[idx].ll = ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y) + (ddz_V * grad_inv_r_arr[idx].ll.z)) * 1e8;
+            extracellular_potential_per_node[idx].rl = ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y) + (ddz_V * grad_inv_r_arr[idx].rl.z)) * 1e8;
+            extracellular_potential_per_node[idx].v1 = ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y) + (ddz_V * grad_inv_r_arr[idx].v1.z)) * 1e8;
+            extracellular_potential_per_node[idx].v2 = ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y) + (ddz_V * grad_inv_r_arr[idx].v2.z)) * 1e8;
+            extracellular_potential_per_node[idx].v3 = ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y) + (ddz_V * grad_inv_r_arr[idx].v3.z)) * 1e8;
+            extracellular_potential_per_node[idx].v4 = ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y) + (ddz_V * grad_inv_r_arr[idx].v4.z)) * 1e8;
+            extracellular_potential_per_node[idx].v5 = ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y) + (ddz_V * grad_inv_r_arr[idx].v5.z)) * 1e8;
+            extracellular_potential_per_node[idx].v6 = ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y) + (ddz_V * grad_inv_r_arr[idx].v6.z)) * 1e8;
         }
         
     `;
@@ -537,7 +537,112 @@ export function computePECGGraphShader2(cellModel, nNodes, elemType, workgroup_s
         
 }
 
-export function computePECGGraphShader3(numPoints, workgroup_size=64){
+export function computePECGGraphShader3(nNodes, numPotentials, workgroup_size=64){
+
+    return /*wgsl*/`
+
+        struct ElectrodesScalar {
+            la : f32,
+            ra : f32,
+            ll : f32,
+            rl : f32,
+            v1 : f32,
+            v2 : f32,
+            v3 : f32,
+            v4 : f32,
+            v5 : f32,
+            v6 : f32
+        };
+
+        @binding(0) @group(0) var<storage, read>       extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
+        @binding(1) @group(0) var<storage, read_write> extracellular_potential : ElectrodesScalar;
+        
+        @compute @workgroup_size(${workgroup_size})
+        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+            
+            //Check for overcomputing and simulation stop
+            let idx = GlobalInvocationID.x; 
+            if(idx >= ${numPotentials}) {return;}
+
+            // Zeroed the buffer with extracellular potentials from before
+            extracellular_potential.la = 0.0;
+            extracellular_potential.ra = 0.0;
+            extracellular_potential.ll = 0.0;
+            extracellular_potential.rl = 0.0;
+            extracellular_potential.v1 = 0.0;
+            extracellular_potential.v2 = 0.0;
+            extracellular_potential.v3 = 0.0;
+            extracellular_potential.v4 = 0.0;
+            extracellular_potential.v5 = 0.0;
+            extracellular_potential.v6 = 0.0;
+
+            if (idx==0){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.la += extracellular_potential_per_node[i].la;    
+                }
+                return;
+            }
+            if (idx==1){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.ra += extracellular_potential_per_node[i].ra;    
+                }
+                return;
+            }
+            if (idx==2){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.ll += extracellular_potential_per_node[i].ll;    
+                }
+                return;
+            }
+            if (idx==3){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.rl += extracellular_potential_per_node[i].rl;    
+                }
+                return;
+            }
+            if (idx==4){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.v1 += extracellular_potential_per_node[i].v1;    
+                }
+                return;
+            }
+            if (idx==5){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.v2 += extracellular_potential_per_node[i].v2;    
+                }
+                return;
+            }
+            if (idx==6){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.v3 += extracellular_potential_per_node[i].v3;    
+                }
+                return;
+            }
+            if (idx==7){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.v4 += extracellular_potential_per_node[i].v4;    
+                }
+                return;
+            }
+            if (idx==8){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.v5 += extracellular_potential_per_node[i].v5;    
+                }
+                return;
+            }
+            if (idx==9){
+                for (var i = 0u; i < ${nNodes}; i++) {
+                    extracellular_potential.v6 += extracellular_potential_per_node[i].v6;    
+                }
+                return;
+            }
+            
+        }
+        
+    `;
+}
+
+export function computePECGGraphShader4(numPoints, workgroup_size=64){
 
     return /*wgsl*/`
 

@@ -1,4 +1,4 @@
-import { SimLineMonodomain } from './main_modules/simLineMonodomain'
+import { SimLineMonodomain } from './main_modules/simLineMonodomain';
 import { SimQuadMonodomain} from './main_modules/simQuadMonodomain';
 import { SimHexaMonodomain} from './main_modules/simHexaMonodomain';
 import { checkWebGPU, meshObj, electrodesObj } from './helpers/helper';
@@ -74,7 +74,7 @@ const paramsPECG = {
     min: -1,
     max: 1,
     num_points: 2000,
-    alpha_smoothing: 0.3
+    alpha_smoothing: 0.6
 };
 pECGVisualizationFolder.add(paramsPECG, 'min');
 pECGVisualizationFolder.add(paramsPECG, 'max');
