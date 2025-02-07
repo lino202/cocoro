@@ -469,6 +469,7 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         0,
         statesArray
     );
+    graphsRenderer.setStatesBuffer(statesBuffer, Float32Array.BYTES_PER_ELEMENT * statesArray.length);
 
     device.queue.writeBuffer(
         fiberOrientationBuffer,

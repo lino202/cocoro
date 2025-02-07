@@ -35,6 +35,7 @@ class PECGGraph {
     integBuffer       : GPUBuffer;
     potentialBuffer   : GPUBuffer;
     visualParamsBuffer: GPUBuffer;
+    smoothingBuffer   : GPUBuffer;
     statesBuffer: GPUBuffer | null = null;
     computeBindGroup2: GPUBindGroup | null = null;
     computeBindGroup3: GPUBindGroup;
@@ -176,6 +177,12 @@ class PECGGraph {
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
         }) as GPUBuffer;
 
+        this.smoothingBuffer = this.device.createBuffer({
+            label: "PECGGraph_smoothingBuffer",
+            size: Float32Array.BYTES_PER_ELEMENT * 1,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+
         const indexs          = this.getIndexesFor12Leads();   //This is the same for all 12 lines
         const coords          = this.getXYCoords();
         const voiInitValues   = new Float32Array(this.numPoints * this.numECGLeads).fill(0);
@@ -201,13 +208,13 @@ class PECGGraph {
             },
         });
 
-        // console.log(computePECGGraphShader3(this.numPoints, this.numECGLeads))
+        // console.log(computePECGGraphShader3(this.numPoints))
         this.computePipeline3 = this.device.createComputePipeline({
             label: 'PECGGraph_ComputePipeline3',
             layout: 'auto',
             compute: {
                 module: this.device.createShaderModule({
-                code: computePECGGraphShader3(this.numPoints, this.numECGLeads)}),
+                code: computePECGGraphShader3(this.numPoints)}),
                 entryPoint: 'comp_main',
             },
         });
@@ -246,6 +253,14 @@ class PECGGraph {
                             buffer: this.voiBufferCopy,
                             offset: 0,
                             size: Float32Array.BYTES_PER_ELEMENT * voiInitValues.length,
+                        },
+                    },
+                    {
+                        binding: 4,
+                        resource: {
+                            buffer: this.smoothingBuffer,
+                            offset: 0,
+                            size: Float32Array.BYTES_PER_ELEMENT * 1,
                         },
                     }
 
@@ -444,7 +459,7 @@ class PECGGraph {
     
         }else if ((this.meshData.elementType == 'quad') || (this.meshData.elementType == 'hexa')){
 
-            const connectionsArray      = new Uint32Array(Object.values(this.meshData.connections));
+            const connectionsArray  = new Uint32Array(Object.values(this.meshData.connections));
             const connectionsBuffer = this.device.createBuffer({
                 size: Uint32Array.BYTES_PER_ELEMENT * connectionsArray.length,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
@@ -519,6 +534,12 @@ class PECGGraph {
                 this.gui.__folders.Visualization.__controllers[0].getValue(),   
                 this.gui.__folders.Visualization.__controllers[1].getValue()
             ])
+        );
+
+        this.device.queue.writeBuffer(
+            this.smoothingBuffer,
+            0,
+            new Float32Array([this.gui.__folders.Visualization.__controllers[3].getValue()])
         );
 
         {   //Compute Update

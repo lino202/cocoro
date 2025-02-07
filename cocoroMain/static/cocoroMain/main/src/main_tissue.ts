@@ -52,7 +52,7 @@ const paramsCellVar = {
     max: 60,
     node_idx: 0,
     var_name: 'vm',
-    num_points: 10000
+    num_points: 2000
 };
 cellVarVisualizationFolder.add(paramsCellVar, 'min');
 cellVarVisualizationFolder.add(paramsCellVar, 'max');
@@ -71,13 +71,15 @@ guiPECGGraphContainer.appendChild(guiPECGGraph.domElement);
 
 const pECGVisualizationFolder = guiPECGGraph.addFolder('Visualization');
 const paramsPECG = {
-    min: -60,
-    max: 60,
-    num_points: 10000
+    min: -1,
+    max: 1,
+    num_points: 2000,
+    alpha_smoothing: 0.3
 };
 pECGVisualizationFolder.add(paramsPECG, 'min');
 pECGVisualizationFolder.add(paramsPECG, 'max');
 pECGVisualizationFolder.add(paramsPECG, 'num_points');
+pECGVisualizationFolder.add(paramsPECG, 'alpha_smoothing', 0, 1);
 pECGVisualizationFolder.close();
 
 

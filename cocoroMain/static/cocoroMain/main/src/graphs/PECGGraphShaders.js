@@ -176,16 +176,16 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential.la += ddx_V * grad_inv_r_arr[idx].la.x * 1e8;
-            extracellular_potential.ra += ddx_V * grad_inv_r_arr[idx].ra.x * 1e8;
-            extracellular_potential.ll += ddx_V * grad_inv_r_arr[idx].ll.x * 1e8;
-            extracellular_potential.rl += ddx_V * grad_inv_r_arr[idx].rl.x * 1e8;
-            extracellular_potential.v1 += ddx_V * grad_inv_r_arr[idx].v1.x * 1e8;
-            extracellular_potential.v2 += ddx_V * grad_inv_r_arr[idx].v2.x * 1e8;
-            extracellular_potential.v3 += ddx_V * grad_inv_r_arr[idx].v3.x * 1e8;
-            extracellular_potential.v4 += ddx_V * grad_inv_r_arr[idx].v4.x * 1e8;
-            extracellular_potential.v5 += ddx_V * grad_inv_r_arr[idx].v5.x * 1e8;
-            extracellular_potential.v6 += ddx_V * grad_inv_r_arr[idx].v6.x * 1e8;
+            extracellular_potential.la += ddx_V * grad_inv_r_arr[idx].la.x * 1e10;
+            extracellular_potential.ra += ddx_V * grad_inv_r_arr[idx].ra.x * 1e10;
+            extracellular_potential.ll += ddx_V * grad_inv_r_arr[idx].ll.x * 1e10;
+            extracellular_potential.rl += ddx_V * grad_inv_r_arr[idx].rl.x * 1e10;
+            extracellular_potential.v1 += ddx_V * grad_inv_r_arr[idx].v1.x * 1e10;
+            extracellular_potential.v2 += ddx_V * grad_inv_r_arr[idx].v2.x * 1e10;
+            extracellular_potential.v3 += ddx_V * grad_inv_r_arr[idx].v3.x * 1e10;
+            extracellular_potential.v4 += ddx_V * grad_inv_r_arr[idx].v4.x * 1e10;
+            extracellular_potential.v5 += ddx_V * grad_inv_r_arr[idx].v5.x * 1e10;
+            extracellular_potential.v6 += ddx_V * grad_inv_r_arr[idx].v6.x * 1e10;
         }
         
     `;
@@ -296,16 +296,218 @@ function computeGradQuad(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential.la += ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y)) * 1e8;
-            extracellular_potential.ra += ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y)) * 1e8;
-            extracellular_potential.ll += ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y)) * 1e8;
-            extracellular_potential.rl += ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y)) * 1e8;
-            extracellular_potential.v1 += ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y)) * 1e8;
-            extracellular_potential.v2 += ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y)) * 1e8;
-            extracellular_potential.v3 += ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y)) * 1e8;
-            extracellular_potential.v4 += ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y)) * 1e8;
-            extracellular_potential.v5 += ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y)) * 1e8;
-            extracellular_potential.v6 += ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y)) * 1e8;
+            extracellular_potential.la += ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y)) * 1e10;
+            extracellular_potential.ra += ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y)) * 1e10;
+            extracellular_potential.ll += ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y)) * 1e10;
+            extracellular_potential.rl += ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y)) * 1e10;
+            extracellular_potential.v1 += ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y)) * 1e10;
+            extracellular_potential.v2 += ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y)) * 1e10;
+            extracellular_potential.v3 += ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y)) * 1e10;
+            extracellular_potential.v4 += ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y)) * 1e10;
+            extracellular_potential.v5 += ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y)) * 1e10;
+            extracellular_potential.v6 += ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y)) * 1e10;
+        }
+        
+    `;
+}
+
+function computeGradHexa(specificDefinitions, nNodes, workgroup_size){
+
+    return /*wgsl*/`
+        
+        ${specificDefinitions}
+
+        struct Coords {
+            x : f32,
+            y : f32,
+            z : f32,
+        };
+
+        struct ElectrodesVectorial {
+            la : Coords,
+            ra : Coords,
+            ll : Coords,
+            rl : Coords,
+            v1 : Coords,
+            v2 : Coords,
+            v3 : Coords,
+            v4 : Coords,
+            v5 : Coords,
+            v6 : Coords
+        };
+
+        struct ElectrodesScalar {
+            la : f32,
+            ra : f32,
+            ll : f32,
+            rl : f32,
+            v1 : f32,
+            v2 : f32,
+            v3 : f32,
+            v4 : f32,
+            v5 : f32,
+            v6 : f32
+        };
+
+        struct Connections {
+            _i_j1_k   :  u32, 
+            _i1_j1_k  :  u32,
+            _i1_j_k   :  u32,
+            _i1_1j_k  :  u32,
+            _i_1j_k   :  u32,
+            _1i_1j_k  :  u32,
+            _1i_j_k   :  u32,
+            _1i_j1_k  :  u32,
+            _i_j_k1   :  u32,
+            _i_j1_k1  :  u32,
+            _i1_j1_k1 :  u32,
+            _i1_j_k1  :  u32,
+            _i1_1j_k1 :  u32,
+            _i_1j_k1  :  u32,
+            _1i_1j_k1 :  u32,
+            _1i_j_k1  :  u32,
+            _1i_j1_k1 :  u32,
+            _i_j_1k   :  u32,
+            _i_j1_1k  :  u32,
+            _i1_j1_1k :  u32,
+            _i1_j_1k  :  u32,
+            _i1_1j_1k :  u32,
+            _i_1j_1k  :  u32,
+            _1i_1j_1k :  u32,
+            _1i_j_1k  :  u32,
+            _1i_j1_1k :  u32
+        };
+
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential : ElectrodesScalar;
+        @binding(1) @group(0) var<storage, read>       states         : array<States, ${nNodes}>;
+        @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
+        @binding(3) @group(0) var<uniform>             dx             : f32;
+        @binding(4) @group(0) var<storage, read>       connections    : array<Connections, ${nNodes}>;
+        
+        @compute @workgroup_size(${workgroup_size})
+        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+            
+            //Check for overcomputing and simulation stop
+            let idx = GlobalInvocationID.x; 
+            if(idx >= ${nNodes}) {return;}
+
+            // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
+            // this is computed for the node idx with respect to all 10 electrodes
+            let _i_j1_k    : u32 = connections[idx]._i_j1_k  ; 
+            let _i1_j1_k   : u32 = connections[idx]._i1_j1_k ; 
+            let _i1_j_k    : u32 = connections[idx]._i1_j_k  ; 
+            let _i1_1j_k   : u32 = connections[idx]._i1_1j_k ; 
+            let _i_1j_k    : u32 = connections[idx]._i_1j_k  ; 
+            let _1i_1j_k   : u32 = connections[idx]._1i_1j_k ; 
+            let _1i_j_k    : u32 = connections[idx]._1i_j_k  ; 
+            let _1i_j1_k   : u32 = connections[idx]._1i_j1_k ; 
+            let _i_j_k1    : u32 = connections[idx]._i_j_k1  ; 
+            let _i_j1_k1   : u32 = connections[idx]._i_j1_k1 ; 
+            let _i1_j1_k1  : u32 = connections[idx]._i1_j1_k1; 
+            let _i1_j_k1   : u32 = connections[idx]._i1_j_k1 ; 
+            let _i1_1j_k1  : u32 = connections[idx]._i1_1j_k1; 
+            let _i_1j_k1   : u32 = connections[idx]._i_1j_k1 ; 
+            let _1i_1j_k1  : u32 = connections[idx]._1i_1j_k1; 
+            let _1i_j_k1   : u32 = connections[idx]._1i_j_k1 ; 
+            let _1i_j1_k1  : u32 = connections[idx]._1i_j1_k1; 
+            let _i_j_1k    : u32 = connections[idx]._i_j_1k  ; 
+            let _i_j1_1k   : u32 = connections[idx]._i_j1_1k ; 
+            let _i1_j1_1k  : u32 = connections[idx]._i1_j1_1k; 
+            let _i1_j_1k   : u32 = connections[idx]._i1_j_1k ; 
+            let _i1_1j_1k  : u32 = connections[idx]._i1_1j_1k; 
+            let _i_1j_1k   : u32 = connections[idx]._i_1j_1k ; 
+            let _1i_1j_1k  : u32 = connections[idx]._1i_1j_1k; 
+            let _1i_j_1k   : u32 = connections[idx]._1i_j_1k ; 
+            let _1i_j1_1k  : u32 = connections[idx]._1i_j1_1k; 
+            var ddx_V:f32 = 0.0;
+            var ddy_V:f32 = 0.0;
+            var ddz_V:f32 = 0.0;
+
+            // ATTENTION The gradient is null in the normal direction of the boundary due to the Newmann condition, 
+            // this is a little trickier than the line and quad
+
+            // after analysis we can see in the donut in 3D or donut cube that we have as boundaries:
+            // - 8 inner corners
+            // - 8 outer corners
+            // - 12 inner lines
+            // - 12 outer lines
+            // - 6 inner faces
+            // - 6 outer faces
+            // If we compute the derivative when the values are available this is right for the nodes in the inner domain
+            // and all outer boundaries and inner faces
+            if ((_i1_j_k < ${nNodes}) & (_1i_j_k < ${nNodes})){
+                ddx_V = (states[_i1_j_k].vm - states[_1i_j_k].vm) / (2*dx);
+            }
+
+            if ((_i_j1_k < ${nNodes}) & (_i_1j_k < ${nNodes})){
+                ddy_V = (states[_i_j1_k].vm - states[_i_1j_k].vm) / (2*dx);
+            }
+
+            if ((_i_j_k1 < ${nNodes}) & (_i_j_1k < ${nNodes})){
+                ddz_V = (states[_i_j_k1].vm - states[_i_j_1k].vm) / (2*dx);
+            }
+
+            // But the above condition is not valid for nodes in the inner lines and inner corners that will have derivatives computed
+            // we need to take care of those manually, this do not work on holes made up of 1 hexa elem ATTENTION
+            // TODO check if this should be zero as I believe it must be
+            
+            // For the inner cornes
+            if (((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k == ${nNodes}))){
+                ddx_V = 0.0;
+                ddy_V = 0.0;
+                ddz_V = 0.0;
+            }
+
+            // For the inner lines, if we lack two corners out of 8 we are in a inner line
+            if (((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k == ${nNodes}))){
+                // ddx remain computed and the others are zeroed
+                ddy_V = 0.0;
+                ddz_V = 0.0;
+            }
+
+            if (((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k == ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k < ${nNodes}))){
+                // ddy remain computed and the others are zeroed
+                ddx_V = 0.0;
+                ddz_V = 0.0;
+            }
+
+            if (((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
+                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k == ${nNodes}))){
+                // ddz remain computed and the others are zeroed
+                ddx_V = 0.0;
+                ddy_V = 0.0;
+            }
+
+            
+            // sum to the same location for accumalation (integral), in line we only need dx 
+            // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
+            // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
+            // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
+            extracellular_potential.la += ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y) + (ddz_V * grad_inv_r_arr[idx].la.z)) * 1e11;
+            extracellular_potential.ra += ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y) + (ddz_V * grad_inv_r_arr[idx].ra.z)) * 1e11;
+            extracellular_potential.ll += ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y) + (ddz_V * grad_inv_r_arr[idx].ll.z)) * 1e11;
+            extracellular_potential.rl += ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y) + (ddz_V * grad_inv_r_arr[idx].rl.z)) * 1e11;
+            extracellular_potential.v1 += ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y) + (ddz_V * grad_inv_r_arr[idx].v1.z)) * 1e11;
+            extracellular_potential.v2 += ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y) + (ddz_V * grad_inv_r_arr[idx].v2.z)) * 1e11;
+            extracellular_potential.v3 += ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y) + (ddz_V * grad_inv_r_arr[idx].v3.z)) * 1e11;
+            extracellular_potential.v4 += ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y) + (ddz_V * grad_inv_r_arr[idx].v4.z)) * 1e11;
+            extracellular_potential.v5 += ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y) + (ddz_V * grad_inv_r_arr[idx].v5.z)) * 1e11;
+            extracellular_potential.v6 += ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y) + (ddz_V * grad_inv_r_arr[idx].v6.z)) * 1e11;
         }
         
     `;
@@ -328,15 +530,14 @@ export function computePECGGraphShader2(cellModel, nNodes, elemType, workgroup_s
     }else if (elemType=='quad'){
         return computeGradQuad(specificDefinitions, nNodes, workgroup_size)
     }else if (elemType=='hexa'){
-        throw new Error(`Unknown Elem Type "${elemType}"`)
-        // return computeGradHexa(specificDefinitions, nNodes, workgroup_size)
+        return computeGradHexa(specificDefinitions, nNodes, workgroup_size)
     }else{
         throw new Error(`Unknown Elem Type "${elemType}"`)
     }
         
 }
 
-export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=64){
+export function computePECGGraphShader3(numPoints, workgroup_size=64){
 
     return /*wgsl*/`
 
@@ -362,6 +563,7 @@ export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=6
         @binding(1) @group(0) var<storage, read_write> vois : array<f32>; //This vois is an array with all the values shown in the pECG graph so it has 12*numPoints (graph points) values
         @binding(2) @group(0) var<storage, read>       visualization : VisualParams;
         @binding(3) @group(0) var<storage, read>       vois_copy : array<f32>;
+        @binding(4) @group(0) var<storage, read>       alpha_smoothing : f32;
         
         @compute @workgroup_size(${workgroup_size})
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -373,12 +575,13 @@ export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=6
             // Vois not in the right tip of the line should just switch the value
             if ( (idx!=(1*${numPoints}-1)) && (idx!=(2*${numPoints}-1)) && (idx!=(3*${numPoints}-1)) && (idx!=(4*${numPoints}-1)) && (idx!=(5*${numPoints}-1)) && (idx!=(6*${numPoints}-1))
              && (idx!=(7*${numPoints}-1)) && (idx!=(8*${numPoints}-1)) && (idx!=(9*${numPoints}-1)) && (idx!=(10*${numPoints}-1)) && (idx!=(11*${numPoints}-1)) && (idx!=(12*${numPoints}-1)) ) {
-                
+
                 vois[idx] = vois_copy[idx+1];
                 return;    
             }
 
             var max_value_to_plot:f32 = 1.0;
+            var min_value_to_plot:f32 = 0.0;
             // Lead I 
             if (idx==(1*${numPoints}-1)){
                 vois[idx] = extracellular_potential.la - extracellular_potential.ra;
@@ -403,43 +606,62 @@ export function computePECGGraphShader3(numPoints, numECGLeads, workgroup_size=6
             if (idx==(6*${numPoints}-1)){
                 vois[idx] = extracellular_potential.ll - (extracellular_potential.ra + extracellular_potential.la) / 2;
             }
+
             // Lead V1 
+            var common_potential:f32 = (extracellular_potential.la + extracellular_potential.ra + extracellular_potential.ll) / 3;
             if (idx==(7*${numPoints}-1)){
-                vois[idx] = extracellular_potential.v1 - (extracellular_potential.la + extracellular_potential.ra + extracellular_potential.ll) / 3;
+                vois[idx] = extracellular_potential.v1 - common_potential;
                 max_value_to_plot = 0.0;
+                min_value_to_plot = -1.0;
             }
             // Lead V2 
             if (idx==(8*${numPoints}-1)){
-                vois[idx] = extracellular_potential.v2 - (extracellular_potential.la + extracellular_potential.ra + extracellular_potential.ll) / 3;
+                vois[idx] = extracellular_potential.v2 - common_potential;
                 max_value_to_plot = 0.0;
+                min_value_to_plot = -1.0;
             }
             // Lead V3
             if (idx==(9*${numPoints}-1)){
-                vois[idx] = extracellular_potential.v3 - (extracellular_potential.la + extracellular_potential.ra + extracellular_potential.ll) / 3;
+                vois[idx] = extracellular_potential.v3 - common_potential;
                 max_value_to_plot = 0.0;
+                min_value_to_plot = -1.0;
             }
             // Lead V4
             if (idx==(10*${numPoints}-1)){
-                vois[idx] = extracellular_potential.v4 - (extracellular_potential.la + extracellular_potential.ra + extracellular_potential.ll) / 3;
+                vois[idx] = extracellular_potential.v4 - common_potential;
                 max_value_to_plot = 0.0;
+                min_value_to_plot = -1.0;
             }
             // Lead V5
             if (idx==(11*${numPoints}-1)){
-                vois[idx] = extracellular_potential.v5 - (extracellular_potential.la + extracellular_potential.ra + extracellular_potential.ll) / 3; 
+                vois[idx] = extracellular_potential.v5 - common_potential; 
                 max_value_to_plot = 0.0;
+                min_value_to_plot = -1.0;
             }
             // Lead V6
             if (idx==(12*${numPoints}-1)){
-                vois[idx] = extracellular_potential.v6 - (extracellular_potential.la + extracellular_potential.ra + extracellular_potential.ll) / 3;
+                vois[idx] = extracellular_potential.v6 - common_potential;
                 max_value_to_plot = 0.0;
+                min_value_to_plot = -1.0;
             }
 
+            // Smoothing
+            // this is more responsive as I can update alpha and is simpler to compute and fast, the user can instantanialy decide if smooth or not
+            // and also the magnitude
+            // is a good first smoothing method rather than using more sophisticated ones that can not be updated on the fly
+            // block alpha to be 0 and 1 if it  zero the calculation is blocked! -> total smoothness if 1 is not smoothed at all
+            vois[idx] = alpha_smoothing * vois[idx] + (1.0 - alpha_smoothing) * vois_copy[idx-1];
+        
             // Pass to vois and normalize to plot
             if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
                 //range needs to be [-0.5,0.5] as after the vertex_shader sums +/-0.5
                 vois[idx] = ((vois[idx] - visualization.min) / (visualization.max - visualization.min)) - 0.5; 
                 if (vois[idx] > max_value_to_plot){
                     vois[idx] = max_value_to_plot;
+                }
+
+                if (vois[idx] < min_value_to_plot){
+                    vois[idx] = min_value_to_plot;
                 }
             }else{
                 vois[idx] = -0.5; //Plot a line in the bottom if this overflows
