@@ -112,7 +112,7 @@ export function computePECGGraphShader1(nNodes, workgroup_size=64){
         
 }
 
-function computeGradLine(specificDefinitions, nNodes, workgroup_size){
+function computeGradLine(specificDefinitions, nNodes, nWorkgroups, workgroup_size){
 
     return /*wgsl*/`
         
@@ -150,17 +150,21 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
             v6 : f32
         };
 
-        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_workgroup : array<ElectrodesScalar, ${nWorkgroups}>;  //This depends on the number of nodes, it can be just 1
         @binding(1) @group(0) var<storage, read>       states : array<States, ${nNodes}>;
         @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             dx : f32;
         
+        var<workgroup> workgroup_data: array<ElectrodesScalar, ${workgroup_size}>;
+        const amplification:f32 = 1e8;
+
         @compute @workgroup_size(${workgroup_size})
-        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>, 
+                     @builtin(local_invocation_id) LocalInvocationId: vec3<u32>,
+                     @builtin(workgroup_id) WorkgroupID: vec3<u32>) {
             
-            //Check for overcomputing and simulation stop
-            let idx = GlobalInvocationID.x; 
-            if(idx >= ${nNodes}) {return;}
+            //Elems over nNodes do not sum anything :D!
+            let idx = GlobalInvocationID.x;
 
             // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
             // this is computed for the node idx with respect to all 10 electrodes
@@ -176,22 +180,89 @@ function computeGradLine(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential_per_node[idx].la = ddx_V * grad_inv_r_arr[idx].la.x * 1e8;
-            extracellular_potential_per_node[idx].ra = ddx_V * grad_inv_r_arr[idx].ra.x * 1e8;
-            extracellular_potential_per_node[idx].ll = ddx_V * grad_inv_r_arr[idx].ll.x * 1e8;
-            extracellular_potential_per_node[idx].rl = ddx_V * grad_inv_r_arr[idx].rl.x * 1e8;
-            extracellular_potential_per_node[idx].v1 = ddx_V * grad_inv_r_arr[idx].v1.x * 1e8;
-            extracellular_potential_per_node[idx].v2 = ddx_V * grad_inv_r_arr[idx].v2.x * 1e8;
-            extracellular_potential_per_node[idx].v3 = ddx_V * grad_inv_r_arr[idx].v3.x * 1e8;
-            extracellular_potential_per_node[idx].v4 = ddx_V * grad_inv_r_arr[idx].v4.x * 1e8;
-            extracellular_potential_per_node[idx].v5 = ddx_V * grad_inv_r_arr[idx].v5.x * 1e8;
-            extracellular_potential_per_node[idx].v6 = ddx_V * grad_inv_r_arr[idx].v6.x * 1e8;
+
+            // We populate the workgroup variable with shared memory/data to synchronously sum
+            workgroup_data[LocalInvocationId.x].la = ddx_V * grad_inv_r_arr[idx].la.x * amplification;
+            workgroup_data[LocalInvocationId.x].ra = ddx_V * grad_inv_r_arr[idx].ra.x * amplification;
+            workgroup_data[LocalInvocationId.x].ll = ddx_V * grad_inv_r_arr[idx].ll.x * amplification;
+            workgroup_data[LocalInvocationId.x].rl = ddx_V * grad_inv_r_arr[idx].rl.x * amplification;
+            workgroup_data[LocalInvocationId.x].v1 = ddx_V * grad_inv_r_arr[idx].v1.x * amplification;
+            workgroup_data[LocalInvocationId.x].v2 = ddx_V * grad_inv_r_arr[idx].v2.x * amplification;
+            workgroup_data[LocalInvocationId.x].v3 = ddx_V * grad_inv_r_arr[idx].v3.x * amplification;
+            workgroup_data[LocalInvocationId.x].v4 = ddx_V * grad_inv_r_arr[idx].v4.x * amplification;
+            workgroup_data[LocalInvocationId.x].v5 = ddx_V * grad_inv_r_arr[idx].v5.x * amplification;
+            workgroup_data[LocalInvocationId.x].v6 = ddx_V * grad_inv_r_arr[idx].v6.x * amplification;
+
+            // Wait to for all invocations in the same workgroup to have the values computed and loaded
+            workgroupBarrier();
+
+            // We synchronously sum all values in the same workgroup, by using several invocations inside the workgroup
+            // it maybe easy to make one invocation to sum all values but the for loop will have more loops so this is faster
+            for (var current_size:u32 = ${workgroup_size} / 2; current_size > 0; current_size /= 2) {
+                var sum_la:f32 = 0.0;
+                var sum_ra:f32 = 0.0;
+                var sum_ll:f32 = 0.0;
+                var sum_rl:f32 = 0.0;
+                var sum_v1:f32 = 0.0;
+                var sum_v2:f32 = 0.0;
+                var sum_v3:f32 = 0.0;
+                var sum_v4:f32 = 0.0;
+                var sum_v5:f32 = 0.0;
+                var sum_v6:f32 = 0.0;
+
+                if (LocalInvocationId.x < current_size) {
+                    sum_la = workgroup_data[LocalInvocationId.x].la + workgroup_data[LocalInvocationId.x + current_size].la;
+                    sum_ra = workgroup_data[LocalInvocationId.x].ra + workgroup_data[LocalInvocationId.x + current_size].ra;
+                    sum_ll = workgroup_data[LocalInvocationId.x].ll + workgroup_data[LocalInvocationId.x + current_size].ll;
+                    sum_rl = workgroup_data[LocalInvocationId.x].rl + workgroup_data[LocalInvocationId.x + current_size].rl;
+                    sum_v1 = workgroup_data[LocalInvocationId.x].v1 + workgroup_data[LocalInvocationId.x + current_size].v1;
+                    sum_v2 = workgroup_data[LocalInvocationId.x].v2 + workgroup_data[LocalInvocationId.x + current_size].v2;
+                    sum_v3 = workgroup_data[LocalInvocationId.x].v3 + workgroup_data[LocalInvocationId.x + current_size].v3;
+                    sum_v4 = workgroup_data[LocalInvocationId.x].v4 + workgroup_data[LocalInvocationId.x + current_size].v4;
+                    sum_v5 = workgroup_data[LocalInvocationId.x].v5 + workgroup_data[LocalInvocationId.x + current_size].v5;
+                    sum_v6 = workgroup_data[LocalInvocationId.x].v6 + workgroup_data[LocalInvocationId.x + current_size].v6;
+                }
+                // Wait until all invocations have finished reading from workgroup_data, and have calculated their respective sums
+                workgroupBarrier();
+
+                if (LocalInvocationId.x < current_size) {
+                    workgroup_data[LocalInvocationId.x].la = sum_la;
+                    workgroup_data[LocalInvocationId.x].ra = sum_ra;
+                    workgroup_data[LocalInvocationId.x].ll = sum_ll;
+                    workgroup_data[LocalInvocationId.x].rl = sum_rl;
+                    workgroup_data[LocalInvocationId.x].v1 = sum_v1;
+                    workgroup_data[LocalInvocationId.x].v2 = sum_v2;
+                    workgroup_data[LocalInvocationId.x].v3 = sum_v3;
+                    workgroup_data[LocalInvocationId.x].v4 = sum_v4;
+                    workgroup_data[LocalInvocationId.x].v5 = sum_v5;
+                    workgroup_data[LocalInvocationId.x].v6 = sum_v6;
+                }
+                // Wait for each invocation to finish one iteration of the loop, and to have finished writing to workgroup_data
+                workgroupBarrier();
+            }
+            
+            // Write the sum to the output
+            if (LocalInvocationId.x == 0) {
+                extracellular_potential_per_workgroup[WorkgroupID.x].la = workgroup_data[0].la;
+                extracellular_potential_per_workgroup[WorkgroupID.x].ra = workgroup_data[0].ra;
+                extracellular_potential_per_workgroup[WorkgroupID.x].ll = workgroup_data[0].ll;
+                extracellular_potential_per_workgroup[WorkgroupID.x].rl = workgroup_data[0].rl;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v1 = workgroup_data[0].v1;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v2 = workgroup_data[0].v2;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v3 = workgroup_data[0].v3;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v4 = workgroup_data[0].v4;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v5 = workgroup_data[0].v5;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v6 = workgroup_data[0].v6;
+            }
+
+
         }
         
     `;
 }
 
-function computeGradQuad(specificDefinitions, nNodes, workgroup_size){
+
+function computeGradQuad(specificDefinitions, nNodes, nWorkgroups, workgroup_size){
 
     return /*wgsl*/`
         
@@ -240,18 +311,22 @@ function computeGradQuad(specificDefinitions, nNodes, workgroup_size){
             _1i_j1 :  u32
         };
 
-        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_workgroup : array<ElectrodesScalar, ${nWorkgroups}>;
         @binding(1) @group(0) var<storage, read>       states         : array<States, ${nNodes}>;
         @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             dx             : f32;
         @binding(4) @group(0) var<storage, read>       connections    : array<Connections, ${nNodes}>;
         
+        var<workgroup> workgroup_data: array<ElectrodesScalar, ${workgroup_size}>;
+        const amplification:f32 = 1e8;
+
         @compute @workgroup_size(${workgroup_size})
-        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>, 
+                     @builtin(local_invocation_id) LocalInvocationId: vec3<u32>,
+                     @builtin(workgroup_id) WorkgroupID: vec3<u32>) {
             
-            //Check for overcomputing and simulation stop
-            let idx = GlobalInvocationID.x; 
-            if(idx >= ${nNodes}) {return;}
+            //Elems over nNodes do not sum anything :D!
+            let idx = GlobalInvocationID.x;
 
             // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
             // this is computed for the node idx with respect to all 10 electrodes
@@ -296,22 +371,86 @@ function computeGradQuad(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential_per_node[idx].la = ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y)) * 1e8;
-            extracellular_potential_per_node[idx].ra = ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y)) * 1e8;
-            extracellular_potential_per_node[idx].ll = ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y)) * 1e8;
-            extracellular_potential_per_node[idx].rl = ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y)) * 1e8;
-            extracellular_potential_per_node[idx].v1 = ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y)) * 1e8;
-            extracellular_potential_per_node[idx].v2 = ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y)) * 1e8;
-            extracellular_potential_per_node[idx].v3 = ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y)) * 1e8;
-            extracellular_potential_per_node[idx].v4 = ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y)) * 1e8;
-            extracellular_potential_per_node[idx].v5 = ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y)) * 1e8;
-            extracellular_potential_per_node[idx].v6 = ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y)) * 1e8;
+            
+            // We populate the workgroup variable with shared memory/data to synchronously sum
+            workgroup_data[LocalInvocationId.x].la = ddx_V * grad_inv_r_arr[idx].la.x * amplification;
+            workgroup_data[LocalInvocationId.x].ra = ddx_V * grad_inv_r_arr[idx].ra.x * amplification;
+            workgroup_data[LocalInvocationId.x].ll = ddx_V * grad_inv_r_arr[idx].ll.x * amplification;
+            workgroup_data[LocalInvocationId.x].rl = ddx_V * grad_inv_r_arr[idx].rl.x * amplification;
+            workgroup_data[LocalInvocationId.x].v1 = ddx_V * grad_inv_r_arr[idx].v1.x * amplification;
+            workgroup_data[LocalInvocationId.x].v2 = ddx_V * grad_inv_r_arr[idx].v2.x * amplification;
+            workgroup_data[LocalInvocationId.x].v3 = ddx_V * grad_inv_r_arr[idx].v3.x * amplification;
+            workgroup_data[LocalInvocationId.x].v4 = ddx_V * grad_inv_r_arr[idx].v4.x * amplification;
+            workgroup_data[LocalInvocationId.x].v5 = ddx_V * grad_inv_r_arr[idx].v5.x * amplification;
+            workgroup_data[LocalInvocationId.x].v6 = ddx_V * grad_inv_r_arr[idx].v6.x * amplification;
+
+            // Wait to for all invocations in the same workgroup to have the values computed and loaded
+            workgroupBarrier();
+
+            // We synchronously sum all values in the same workgroup, by using several invocations inside the workgroup
+            // it maybe easy to make one invocation to sum all values but the for loop will have more loops so this is faster
+            for (var current_size:u32 = ${workgroup_size} / 2; current_size > 0; current_size /= 2) {
+                var sum_la:f32 = 0.0;
+                var sum_ra:f32 = 0.0;
+                var sum_ll:f32 = 0.0;
+                var sum_rl:f32 = 0.0;
+                var sum_v1:f32 = 0.0;
+                var sum_v2:f32 = 0.0;
+                var sum_v3:f32 = 0.0;
+                var sum_v4:f32 = 0.0;
+                var sum_v5:f32 = 0.0;
+                var sum_v6:f32 = 0.0;
+
+                if (LocalInvocationId.x < current_size) {
+                    sum_la = workgroup_data[LocalInvocationId.x].la + workgroup_data[LocalInvocationId.x + current_size].la;
+                    sum_ra = workgroup_data[LocalInvocationId.x].ra + workgroup_data[LocalInvocationId.x + current_size].ra;
+                    sum_ll = workgroup_data[LocalInvocationId.x].ll + workgroup_data[LocalInvocationId.x + current_size].ll;
+                    sum_rl = workgroup_data[LocalInvocationId.x].rl + workgroup_data[LocalInvocationId.x + current_size].rl;
+                    sum_v1 = workgroup_data[LocalInvocationId.x].v1 + workgroup_data[LocalInvocationId.x + current_size].v1;
+                    sum_v2 = workgroup_data[LocalInvocationId.x].v2 + workgroup_data[LocalInvocationId.x + current_size].v2;
+                    sum_v3 = workgroup_data[LocalInvocationId.x].v3 + workgroup_data[LocalInvocationId.x + current_size].v3;
+                    sum_v4 = workgroup_data[LocalInvocationId.x].v4 + workgroup_data[LocalInvocationId.x + current_size].v4;
+                    sum_v5 = workgroup_data[LocalInvocationId.x].v5 + workgroup_data[LocalInvocationId.x + current_size].v5;
+                    sum_v6 = workgroup_data[LocalInvocationId.x].v6 + workgroup_data[LocalInvocationId.x + current_size].v6;
+                }
+                // Wait until all invocations have finished reading from workgroup_data, and have calculated their respective sums
+                workgroupBarrier();
+
+                if (LocalInvocationId.x < current_size) {
+                    workgroup_data[LocalInvocationId.x].la = sum_la;
+                    workgroup_data[LocalInvocationId.x].ra = sum_ra;
+                    workgroup_data[LocalInvocationId.x].ll = sum_ll;
+                    workgroup_data[LocalInvocationId.x].rl = sum_rl;
+                    workgroup_data[LocalInvocationId.x].v1 = sum_v1;
+                    workgroup_data[LocalInvocationId.x].v2 = sum_v2;
+                    workgroup_data[LocalInvocationId.x].v3 = sum_v3;
+                    workgroup_data[LocalInvocationId.x].v4 = sum_v4;
+                    workgroup_data[LocalInvocationId.x].v5 = sum_v5;
+                    workgroup_data[LocalInvocationId.x].v6 = sum_v6;
+                }
+                // Wait for each invocation to finish one iteration of the loop, and to have finished writing to workgroup_data
+                workgroupBarrier();
+            }
+            
+            // Write the sum to the output
+            if (LocalInvocationId.x == 0) {
+                extracellular_potential_per_workgroup[WorkgroupID.x].la = workgroup_data[0].la;
+                extracellular_potential_per_workgroup[WorkgroupID.x].ra = workgroup_data[0].ra;
+                extracellular_potential_per_workgroup[WorkgroupID.x].ll = workgroup_data[0].ll;
+                extracellular_potential_per_workgroup[WorkgroupID.x].rl = workgroup_data[0].rl;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v1 = workgroup_data[0].v1;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v2 = workgroup_data[0].v2;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v3 = workgroup_data[0].v3;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v4 = workgroup_data[0].v4;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v5 = workgroup_data[0].v5;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v6 = workgroup_data[0].v6;
+            }
         }
         
     `;
 }
 
-function computeGradHexa(specificDefinitions, nNodes, workgroup_size){
+function computeGradHexa(specificDefinitions, nNodes, nWorkgroups, workgroup_size){
 
     return /*wgsl*/`
         
@@ -378,18 +517,22 @@ function computeGradHexa(specificDefinitions, nNodes, workgroup_size){
             _1i_j1_1k :  u32
         };
 
-        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
+        @binding(0) @group(0) var<storage, read_write> extracellular_potential_per_workgroup : array<ElectrodesScalar, ${nWorkgroups}>;
         @binding(1) @group(0) var<storage, read>       states         : array<States, ${nNodes}>;
         @binding(2) @group(0) var<storage, read>       grad_inv_r_arr : array<ElectrodesVectorial, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             dx             : f32;
         @binding(4) @group(0) var<storage, read>       connections    : array<Connections, ${nNodes}>;
         
+        var<workgroup> workgroup_data: array<ElectrodesScalar, ${workgroup_size}>;
+        const amplification:f32 = 1e8;
+
         @compute @workgroup_size(${workgroup_size})
-        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+        fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>, 
+                     @builtin(local_invocation_id) LocalInvocationId: vec3<u32>,
+                     @builtin(workgroup_id) WorkgroupID: vec3<u32>) {
             
-            //Check for overcomputing and simulation stop
-            let idx = GlobalInvocationID.x; 
-            if(idx >= ${nNodes}) {return;}
+            //Elems over nNodes do not sum anything :D!
+            let idx = GlobalInvocationID.x;
 
             // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
             // this is computed for the node idx with respect to all 10 electrodes
@@ -498,22 +641,86 @@ function computeGradHexa(specificDefinitions, nNodes, workgroup_size){
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
             // integral scale the results for having the right mV units of the ECG but here that is not neccesary as we scalate the 
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
-            extracellular_potential_per_node[idx].la = ((ddx_V * grad_inv_r_arr[idx].la.x) + (ddy_V * grad_inv_r_arr[idx].la.y) + (ddz_V * grad_inv_r_arr[idx].la.z)) * 1e8;
-            extracellular_potential_per_node[idx].ra = ((ddx_V * grad_inv_r_arr[idx].ra.x) + (ddy_V * grad_inv_r_arr[idx].ra.y) + (ddz_V * grad_inv_r_arr[idx].ra.z)) * 1e8;
-            extracellular_potential_per_node[idx].ll = ((ddx_V * grad_inv_r_arr[idx].ll.x) + (ddy_V * grad_inv_r_arr[idx].ll.y) + (ddz_V * grad_inv_r_arr[idx].ll.z)) * 1e8;
-            extracellular_potential_per_node[idx].rl = ((ddx_V * grad_inv_r_arr[idx].rl.x) + (ddy_V * grad_inv_r_arr[idx].rl.y) + (ddz_V * grad_inv_r_arr[idx].rl.z)) * 1e8;
-            extracellular_potential_per_node[idx].v1 = ((ddx_V * grad_inv_r_arr[idx].v1.x) + (ddy_V * grad_inv_r_arr[idx].v1.y) + (ddz_V * grad_inv_r_arr[idx].v1.z)) * 1e8;
-            extracellular_potential_per_node[idx].v2 = ((ddx_V * grad_inv_r_arr[idx].v2.x) + (ddy_V * grad_inv_r_arr[idx].v2.y) + (ddz_V * grad_inv_r_arr[idx].v2.z)) * 1e8;
-            extracellular_potential_per_node[idx].v3 = ((ddx_V * grad_inv_r_arr[idx].v3.x) + (ddy_V * grad_inv_r_arr[idx].v3.y) + (ddz_V * grad_inv_r_arr[idx].v3.z)) * 1e8;
-            extracellular_potential_per_node[idx].v4 = ((ddx_V * grad_inv_r_arr[idx].v4.x) + (ddy_V * grad_inv_r_arr[idx].v4.y) + (ddz_V * grad_inv_r_arr[idx].v4.z)) * 1e8;
-            extracellular_potential_per_node[idx].v5 = ((ddx_V * grad_inv_r_arr[idx].v5.x) + (ddy_V * grad_inv_r_arr[idx].v5.y) + (ddz_V * grad_inv_r_arr[idx].v5.z)) * 1e8;
-            extracellular_potential_per_node[idx].v6 = ((ddx_V * grad_inv_r_arr[idx].v6.x) + (ddy_V * grad_inv_r_arr[idx].v6.y) + (ddz_V * grad_inv_r_arr[idx].v6.z)) * 1e8;
+
+            // We populate the workgroup variable with shared memory/data to synchronously sum
+            workgroup_data[LocalInvocationId.x].la = ddx_V * grad_inv_r_arr[idx].la.x * amplification;
+            workgroup_data[LocalInvocationId.x].ra = ddx_V * grad_inv_r_arr[idx].ra.x * amplification;
+            workgroup_data[LocalInvocationId.x].ll = ddx_V * grad_inv_r_arr[idx].ll.x * amplification;
+            workgroup_data[LocalInvocationId.x].rl = ddx_V * grad_inv_r_arr[idx].rl.x * amplification;
+            workgroup_data[LocalInvocationId.x].v1 = ddx_V * grad_inv_r_arr[idx].v1.x * amplification;
+            workgroup_data[LocalInvocationId.x].v2 = ddx_V * grad_inv_r_arr[idx].v2.x * amplification;
+            workgroup_data[LocalInvocationId.x].v3 = ddx_V * grad_inv_r_arr[idx].v3.x * amplification;
+            workgroup_data[LocalInvocationId.x].v4 = ddx_V * grad_inv_r_arr[idx].v4.x * amplification;
+            workgroup_data[LocalInvocationId.x].v5 = ddx_V * grad_inv_r_arr[idx].v5.x * amplification;
+            workgroup_data[LocalInvocationId.x].v6 = ddx_V * grad_inv_r_arr[idx].v6.x * amplification;
+
+            // Wait to for all invocations in the same workgroup to have the values computed and loaded
+            workgroupBarrier();
+
+            // We synchronously sum all values in the same workgroup, by using several invocations inside the workgroup
+            // it maybe easy to make one invocation to sum all values but the for loop will have more loops so this is faster
+            for (var current_size:u32 = ${workgroup_size} / 2; current_size > 0; current_size /= 2) {
+                var sum_la:f32 = 0.0;
+                var sum_ra:f32 = 0.0;
+                var sum_ll:f32 = 0.0;
+                var sum_rl:f32 = 0.0;
+                var sum_v1:f32 = 0.0;
+                var sum_v2:f32 = 0.0;
+                var sum_v3:f32 = 0.0;
+                var sum_v4:f32 = 0.0;
+                var sum_v5:f32 = 0.0;
+                var sum_v6:f32 = 0.0;
+
+                if (LocalInvocationId.x < current_size) {
+                    sum_la = workgroup_data[LocalInvocationId.x].la + workgroup_data[LocalInvocationId.x + current_size].la;
+                    sum_ra = workgroup_data[LocalInvocationId.x].ra + workgroup_data[LocalInvocationId.x + current_size].ra;
+                    sum_ll = workgroup_data[LocalInvocationId.x].ll + workgroup_data[LocalInvocationId.x + current_size].ll;
+                    sum_rl = workgroup_data[LocalInvocationId.x].rl + workgroup_data[LocalInvocationId.x + current_size].rl;
+                    sum_v1 = workgroup_data[LocalInvocationId.x].v1 + workgroup_data[LocalInvocationId.x + current_size].v1;
+                    sum_v2 = workgroup_data[LocalInvocationId.x].v2 + workgroup_data[LocalInvocationId.x + current_size].v2;
+                    sum_v3 = workgroup_data[LocalInvocationId.x].v3 + workgroup_data[LocalInvocationId.x + current_size].v3;
+                    sum_v4 = workgroup_data[LocalInvocationId.x].v4 + workgroup_data[LocalInvocationId.x + current_size].v4;
+                    sum_v5 = workgroup_data[LocalInvocationId.x].v5 + workgroup_data[LocalInvocationId.x + current_size].v5;
+                    sum_v6 = workgroup_data[LocalInvocationId.x].v6 + workgroup_data[LocalInvocationId.x + current_size].v6;
+                }
+                // Wait until all invocations have finished reading from workgroup_data, and have calculated their respective sums
+                workgroupBarrier();
+
+                if (LocalInvocationId.x < current_size) {
+                    workgroup_data[LocalInvocationId.x].la = sum_la;
+                    workgroup_data[LocalInvocationId.x].ra = sum_ra;
+                    workgroup_data[LocalInvocationId.x].ll = sum_ll;
+                    workgroup_data[LocalInvocationId.x].rl = sum_rl;
+                    workgroup_data[LocalInvocationId.x].v1 = sum_v1;
+                    workgroup_data[LocalInvocationId.x].v2 = sum_v2;
+                    workgroup_data[LocalInvocationId.x].v3 = sum_v3;
+                    workgroup_data[LocalInvocationId.x].v4 = sum_v4;
+                    workgroup_data[LocalInvocationId.x].v5 = sum_v5;
+                    workgroup_data[LocalInvocationId.x].v6 = sum_v6;
+                }
+                // Wait for each invocation to finish one iteration of the loop, and to have finished writing to workgroup_data
+                workgroupBarrier();
+            }
+            
+            // Write the sum to the output
+            if (LocalInvocationId.x == 0) {
+                extracellular_potential_per_workgroup[WorkgroupID.x].la = workgroup_data[0].la;
+                extracellular_potential_per_workgroup[WorkgroupID.x].ra = workgroup_data[0].ra;
+                extracellular_potential_per_workgroup[WorkgroupID.x].ll = workgroup_data[0].ll;
+                extracellular_potential_per_workgroup[WorkgroupID.x].rl = workgroup_data[0].rl;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v1 = workgroup_data[0].v1;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v2 = workgroup_data[0].v2;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v3 = workgroup_data[0].v3;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v4 = workgroup_data[0].v4;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v5 = workgroup_data[0].v5;
+                extracellular_potential_per_workgroup[WorkgroupID.x].v6 = workgroup_data[0].v6;
+            }
         }
         
     `;
 }
 
-export function computePECGGraphShader2(cellModel, nNodes, elemType, workgroup_size=64){
+export function computePECGGraphShader2(cellModel, nNodes, elemType, nWorkgroups, workgroup_size){
 
     var specificDefinitions;
     if (cellModel == 'Fenton_Karma'){
@@ -526,18 +733,18 @@ export function computePECGGraphShader2(cellModel, nNodes, elemType, workgroup_s
 
 
     if (elemType=='line'){
-        return computeGradLine(specificDefinitions, nNodes, workgroup_size)
+        return computeGradLine(specificDefinitions, nNodes, nWorkgroups, workgroup_size)
     }else if (elemType=='quad'){
-        return computeGradQuad(specificDefinitions, nNodes, workgroup_size)
+        return computeGradQuad(specificDefinitions, nNodes, nWorkgroups, workgroup_size)
     }else if (elemType=='hexa'){
-        return computeGradHexa(specificDefinitions, nNodes, workgroup_size)
+        return computeGradHexa(specificDefinitions, nNodes, nWorkgroups, workgroup_size)
     }else{
         throw new Error(`Unknown Elem Type "${elemType}"`)
     }
         
 }
 
-export function computePECGGraphShader3(nNodes, numPotentials, workgroup_size=64){
+export function computePECGGraphShader3(nNodes, numPotentials, nWorkgroupsComputeShader2, workgroup_size=64){
 
     return /*wgsl*/`
 
@@ -554,7 +761,7 @@ export function computePECGGraphShader3(nNodes, numPotentials, workgroup_size=64
             v6 : f32
         };
 
-        @binding(0) @group(0) var<storage, read>       extracellular_potential_per_node : array<ElectrodesScalar, ${nNodes}>;
+        @binding(0) @group(0) var<storage, read>       extracellular_potential_per_workgroup : array<ElectrodesScalar, ${nWorkgroupsComputeShader2}>;
         @binding(1) @group(0) var<storage, read_write> extracellular_potential : ElectrodesScalar;
         
         @compute @workgroup_size(${workgroup_size})
@@ -578,61 +785,61 @@ export function computePECGGraphShader3(nNodes, numPotentials, workgroup_size=64
 
             if (idx==0){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.la += extracellular_potential_per_node[i].la;    
+                    extracellular_potential.la += extracellular_potential_per_workgroup[i].la;    
                 }
                 return;
             }
             if (idx==1){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.ra += extracellular_potential_per_node[i].ra;    
+                    extracellular_potential.ra += extracellular_potential_per_workgroup[i].ra;    
                 }
                 return;
             }
             if (idx==2){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.ll += extracellular_potential_per_node[i].ll;    
+                    extracellular_potential.ll += extracellular_potential_per_workgroup[i].ll;    
                 }
                 return;
             }
             if (idx==3){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.rl += extracellular_potential_per_node[i].rl;    
+                    extracellular_potential.rl += extracellular_potential_per_workgroup[i].rl;    
                 }
                 return;
             }
             if (idx==4){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.v1 += extracellular_potential_per_node[i].v1;    
+                    extracellular_potential.v1 += extracellular_potential_per_workgroup[i].v1;    
                 }
                 return;
             }
             if (idx==5){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.v2 += extracellular_potential_per_node[i].v2;    
+                    extracellular_potential.v2 += extracellular_potential_per_workgroup[i].v2;    
                 }
                 return;
             }
             if (idx==6){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.v3 += extracellular_potential_per_node[i].v3;    
+                    extracellular_potential.v3 += extracellular_potential_per_workgroup[i].v3;    
                 }
                 return;
             }
             if (idx==7){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.v4 += extracellular_potential_per_node[i].v4;    
+                    extracellular_potential.v4 += extracellular_potential_per_workgroup[i].v4;    
                 }
                 return;
             }
             if (idx==8){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.v5 += extracellular_potential_per_node[i].v5;    
+                    extracellular_potential.v5 += extracellular_potential_per_workgroup[i].v5;    
                 }
                 return;
             }
             if (idx==9){
                 for (var i = 0u; i < ${nNodes}; i++) {
-                    extracellular_potential.v6 += extracellular_potential_per_node[i].v6;    
+                    extracellular_potential.v6 += extracellular_potential_per_workgroup[i].v6;    
                 }
                 return;
             }

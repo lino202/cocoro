@@ -23,7 +23,7 @@ class GraphsRenderer {
     pECGGraph: PECGGraph|undefined = undefined; 
 
     constructor(device:GPUDevice, textureFormat:GPUTextureFormat, canvases:extraCanvases, 
-                cellObj:cellObj, meshData:meshObj, electrodesData:electrodesObj, guiCellVarGraph:GUI, guiPECGGraph:GUI) {
+                cellObj:cellObj, meshData:meshObj, electrodesData:electrodesObj, adapterLimits:GPUSupportedLimits, guiCellVarGraph:GUI, guiPECGGraph:GUI) {
         this.device = device;
         this.textureFormat = textureFormat;
         this.canvases = canvases;
@@ -41,7 +41,7 @@ class GraphsRenderer {
             this.cellVarGraph = new CellVarGraph(this.device, this.canvases.cellVar, this.textureFormat, this.cellObj, this.nNodes, this.guiCellVarGraph);
         }
         if (this.canvases.pECG != undefined){
-            this.pECGGraph = new PECGGraph(this.device, this.canvases.pECG, this.textureFormat, this.cellObj, meshData, electrodesData, this.nNodes, this.guiPECGGraph)
+            this.pECGGraph = new PECGGraph(this.device, this.canvases.pECG, this.textureFormat, this.cellObj, meshData, electrodesData, this.nNodes, adapterLimits, this.guiPECGGraph)
         }
         
     }

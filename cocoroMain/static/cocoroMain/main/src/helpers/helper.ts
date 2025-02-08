@@ -182,7 +182,7 @@ export const initGPU = async () => {
         alphaMode: "premultiplied"
     })
 
-    return{device, canvas, textureFormat, context, extraCanvases};
+    return{device, canvas, textureFormat, context, extraCanvases, adapterLimits};
 
 }
 

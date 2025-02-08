@@ -43,7 +43,7 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
     const gpu = await initGPU();
     const device = gpu.device;
     const graphsRenderer:GraphsRenderer = new GraphsRenderer(device, gpu.textureFormat, gpu.extraCanvases, 
-                                            cellObj, meshData, electrodesData, 
+                                            cellObj, meshData, electrodesData, gpu.adapterLimits,
                                             guiCellVarGraph, guiPECGGraph);
     
     const integ = {

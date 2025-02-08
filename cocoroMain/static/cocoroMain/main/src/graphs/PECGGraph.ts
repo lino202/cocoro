@@ -20,31 +20,33 @@ class PECGGraph {
     computePipeline3: GPUComputePipeline;
     computePipeline4: GPUComputePipeline;
     renderPassDescriptor: GPURenderPassDescriptor;
-    numberOfIndexes   : number;
-    coordsBuffer      : GPUBuffer;
-    indexBuffer       : GPUBuffer;
-    voiBuffer         : GPUBuffer;
-    voiBufferCopy     : GPUBuffer; //avoids data race on shader invocations
-    meshData          : meshObj;
-    electrodesData    : electrodesObj;
-    nNodes            : number;
-    workgroupSize     : number;
-    cellObj           : cellObj;
-    numPotentials     : number;
-    numECGLeads       : number;
-    gradInvRBuffer    : GPUBuffer;
-    integBuffer       : GPUBuffer;
-    potentialBuffer   : GPUBuffer;
-    visualParamsBuffer: GPUBuffer;
-    smoothingBuffer   : GPUBuffer;
-    potentialPerNodeBuffer : GPUBuffer;
+    numberOfIndexes             : number;
+    coordsBuffer                : GPUBuffer;
+    indexBuffer                 : GPUBuffer;
+    voiBuffer                   : GPUBuffer;
+    voiBufferCopy               : GPUBuffer; //avoids data race on shader invocations
+    meshData                    : meshObj;
+    electrodesData              : electrodesObj;
+    nNodes                      : number;
+    workgroupSize               : number;
+    maxWorkgroupSize            : number;
+    cellObj                     : cellObj;
+    numPotentials               : number;
+    numECGLeads                 : number;
+    gradInvRBuffer              : GPUBuffer;
+    integBuffer                 : GPUBuffer;
+    potentialBuffer             : GPUBuffer;
+    visualParamsBuffer          : GPUBuffer;
+    smoothingBuffer             : GPUBuffer;
+    potentialPerWorkgroupBuffer : GPUBuffer;
     statesBuffer: GPUBuffer | null = null;
     computeBindGroup2: GPUBindGroup | null = null;
     computeBindGroup3: GPUBindGroup;
     computeBindGroup4: GPUBindGroup;
+    nWorkgroupsComputeShader2   : number;
 
     constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:cellObj,
-                meshData:meshObj, electrodesData:electrodesObj, nNodes:number, gui:GUI, workgroupSize:number=64) {
+                meshData:meshObj, electrodesData:electrodesObj, nNodes:number, adapterLimits:GPUSupportedLimits, gui:GUI, workgroupSize:number=64) {
         this.device = device;
         this.textureFormat = textureFormat;
         this.canvas = canvas;
@@ -56,6 +58,7 @@ class PECGGraph {
         this.electrodesData = electrodesData;
         this.nNodes    = nNodes;
         this.workgroupSize = workgroupSize;
+        this.maxWorkgroupSize = adapterLimits.maxComputeInvocationsPerWorkgroup;
         this.cellObj = cellObj;
         this.numPotentials = 10;
         this.numECGLeads   = 12;
@@ -157,22 +160,34 @@ class PECGGraph {
 
         this.computeGradRInvArr()
 
-        // Last 2
-        // now we have grad 1/r in gradInvRBuffer, so we set the last compute shaders
-        const integArr  = new Float32Array([this.meshData.dx]);
-        this.integBuffer = this.device.createBuffer({
-            label: 'PECGGraph_integBuffer',
-            size: Float32Array.BYTES_PER_ELEMENT * integArr.length,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        }) as GPUBuffer;
-        this.device.queue.writeBuffer(this.integBuffer, 0, integArr);
+        // Compute shader 2
+        // now we have grad 1/r in gradInvRBuffer
 
-        this.potentialPerNodeBuffer = this.device.createBuffer({
+        // We need to know the limits of invocations per workgroup of the current gpu to synchronously get the sum (integral)
+        // of the pecg equation's integrand AVOIDING data races but MINIMAZING the length of the arrays in potentialPerWorkgroupBuffer.
+        // In this way we make the for-loops that sum the final extracellular potential in compute shader 3 as short as our hardware enables it. 
+
+        // Now we need to know the maxWorkGroupSize we can use, this number will generate maxWorkGroupSize * 40 bytes (10 potentials using 4 bytes each)
+        // of storage in the workgroups and we are limited by maxComputeWorkgroupStorageSize -> so we calculate the higher maxWorkGroupSize that will 
+        // not violate this storage size limitation and compute the largest power of 2 that is lower or equal than this maxWorkGroupSize, if this is lower than
+        // maxComputeInvocationsPerWorkgroup we use t
+
+        var maxWorkgroupSizePerMemory = Math.floor(adapterLimits.maxComputeWorkgroupStorageSize / (Float32Array.BYTES_PER_ELEMENT * this.numPotentials));
+        if (maxWorkgroupSizePerMemory<this.maxWorkgroupSize){
+            // this computes the power of two <= to the maxWorkgroupSizePerMemory, we need maxWorkgroupSize to be a power of 2 in order 
+            // to sum all values in the workgroup, cause if we have a current_size (see compute shader 2) that is odd we will not sum 
+            // the last elem in the array.
+            this.maxWorkgroupSize = 1 << (Math.floor(Math.log2(maxWorkgroupSizePerMemory)));
+        }
+        
+
+        this.nWorkgroupsComputeShader2 = Math.ceil(this.nNodes / this.maxWorkgroupSize);
+        this.potentialPerWorkgroupBuffer = this.device.createBuffer({
             label: 'PECGGraph_potentialBuffer',
             size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         }) as GPUBuffer;
-        this.device.queue.writeBuffer(this.potentialPerNodeBuffer, 0, new Float32Array(this.numPotentials*this.nNodes).fill(0));
+        this.device.queue.writeBuffer(this.potentialPerWorkgroupBuffer, 0, new Float32Array(this.numPotentials*this.nWorkgroupsComputeShader2).fill(0));
 
         // not init here as this should be cleared every iteration
         this.potentialBuffer = this.device.createBuffer({
@@ -181,6 +196,14 @@ class PECGGraph {
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         }) as GPUBuffer;
         this.device.queue.writeBuffer(this.potentialBuffer, 0, new Float32Array(this.numPotentials).fill(0));
+
+        const integArr  = new Float32Array([this.meshData.dx]);
+        this.integBuffer = this.device.createBuffer({
+            label: 'PECGGraph_integBuffer',
+            size: Float32Array.BYTES_PER_ELEMENT * integArr.length,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.integBuffer, 0, integArr);
 
         const visualParamsArray = new Float32Array([this.min, this.max]);
         this.visualParamsBuffer = this.device.createBuffer({
@@ -209,24 +232,26 @@ class PECGGraph {
         }) as GPUBuffer;
         this.device.queue.writeBuffer(this.voiBufferCopy, 0, voiInitValues);
 
-        // console.log(computePECGGraphShader2(this.cellObj.cellModel, this.nNodes, this.meshData.elementType))
+        // console.log(computePECGGraphShader2(this.cellObj.cellModel, this.nNodes, this.meshData.elementType, this.nWorkgroupsComputeShader2, this.maxWorkgroupSize));
         this.computePipeline2 = this.device.createComputePipeline({
             label: 'PECGGraph_ComputePipeline2',
             layout: 'auto',
             compute: {
                 module: this.device.createShaderModule({
-                code: computePECGGraphShader2(this.cellObj.cellModel, this.nNodes, this.meshData.elementType)}),
+                code: computePECGGraphShader2(this.cellObj.cellModel, this.nNodes, this.meshData.elementType, this.nWorkgroupsComputeShader2, this.maxWorkgroupSize)}),
                 entryPoint: 'comp_main',
             },
         });
 
-        // console.log(computePECGGraphShader3(this.nNodes, this.numPotentials))
+        // Compute shaders 3 and 4
+
+        // console.log(computePECGGraphShader3(this.nNodes, this.numPotentials, this.nWorkgroupsComputeShader2))
         this.computePipeline3 = this.device.createComputePipeline({
             label: 'PECGGraph_ComputePipeline3',
             layout: 'auto',
             compute: {
                 module: this.device.createShaderModule({
-                code: computePECGGraphShader3(this.nNodes, this.numPotentials)}),
+                code: computePECGGraphShader3(this.nNodes, this.numPotentials, this.nWorkgroupsComputeShader2)}),
                 entryPoint: 'comp_main',
             },
         });
@@ -238,9 +263,9 @@ class PECGGraph {
                     {
                         binding: 0,
                         resource: {
-                            buffer: this.potentialPerNodeBuffer,
+                            buffer: this.potentialPerWorkgroupBuffer,
                             offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
+                            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nWorkgroupsComputeShader2,
                         },
                     },
                     {
@@ -471,9 +496,9 @@ class PECGGraph {
                         {
                             binding: 0,
                             resource: {
-                                buffer: this.potentialPerNodeBuffer,
+                                buffer: this.potentialPerWorkgroupBuffer,
                                 offset: 0,
-                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nWorkgroupsComputeShader2,
                             },
                         },
                         {
@@ -518,9 +543,9 @@ class PECGGraph {
                         {
                             binding: 0,
                             resource: {
-                                buffer: this.potentialPerNodeBuffer,
+                                buffer: this.potentialPerWorkgroupBuffer,
                                 offset: 0,
-                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
+                                size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nWorkgroupsComputeShader2,
                             },
                         },
                         {
@@ -589,7 +614,7 @@ class PECGGraph {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(this.computePipeline2);
             passEncoder.setBindGroup(0, this.computeBindGroup2);
-            passEncoder.dispatchWorkgroups(Math.ceil(this.nNodes / this.workgroupSize));
+            passEncoder.dispatchWorkgroups(this.nWorkgroupsComputeShader2);
             passEncoder.end();
         }
         {   //Compute Update
