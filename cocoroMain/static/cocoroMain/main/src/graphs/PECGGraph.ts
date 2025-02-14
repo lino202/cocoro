@@ -184,7 +184,7 @@ class PECGGraph {
         this.nWorkgroupsComputeShader2 = Math.ceil(this.nNodes / this.maxWorkgroupSize);
         this.potentialPerWorkgroupBuffer = this.device.createBuffer({
             label: 'PECGGraph_potentialBuffer',
-            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nNodes,
+            size: Float32Array.BYTES_PER_ELEMENT * this.numPotentials * this.nWorkgroupsComputeShader2,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
         }) as GPUBuffer;
         this.device.queue.writeBuffer(this.potentialPerWorkgroupBuffer, 0, new Float32Array(this.numPotentials*this.nWorkgroupsComputeShader2).fill(0));
@@ -245,13 +245,13 @@ class PECGGraph {
 
         // Compute shaders 3 and 4
 
-        // console.log(computePECGGraphShader3(this.nNodes, this.numPotentials, this.nWorkgroupsComputeShader2))
+        // console.log(computePECGGraphShader3(this.nWorkgroupsComputeShader2))
         this.computePipeline3 = this.device.createComputePipeline({
             label: 'PECGGraph_ComputePipeline3',
             layout: 'auto',
             compute: {
                 module: this.device.createShaderModule({
-                code: computePECGGraphShader3(this.nNodes, this.numPotentials, this.nWorkgroupsComputeShader2)}),
+                code: computePECGGraphShader3(this.nWorkgroupsComputeShader2)}),
                 entryPoint: 'comp_main',
             },
         });
@@ -621,7 +621,7 @@ class PECGGraph {
             const passEncoder = commandEncoder.beginComputePass();
             passEncoder.setPipeline(this.computePipeline3);
             passEncoder.setBindGroup(0, this.computeBindGroup3);
-            passEncoder.dispatchWorkgroups(Math.ceil((this.numPotentials) / this.workgroupSize));
+            passEncoder.dispatchWorkgroups(1);
             passEncoder.end();
         }
         {   //Compute Update

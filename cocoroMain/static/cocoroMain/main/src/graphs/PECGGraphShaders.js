@@ -744,7 +744,7 @@ export function computePECGGraphShader2(cellModel, nNodes, elemType, nWorkgroups
         
 }
 
-export function computePECGGraphShader3(nNodes, numPotentials, nWorkgroupsComputeShader2, workgroup_size=64){
+export function computePECGGraphShader3(nWorkgroupsComputeShader2, workgroup_size=10){
 
     return /*wgsl*/`
 
@@ -768,77 +768,73 @@ export function computePECGGraphShader3(nNodes, numPotentials, nWorkgroupsComput
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             
             //Check for overcomputing and simulation stop
-            let idx = GlobalInvocationID.x; 
-            if(idx >= ${numPotentials}) {return;}
 
-            // Zeroed the buffer with extracellular potentials from before
-            extracellular_potential.la = 0.0;
-            extracellular_potential.ra = 0.0;
-            extracellular_potential.ll = 0.0;
-            extracellular_potential.rl = 0.0;
-            extracellular_potential.v1 = 0.0;
-            extracellular_potential.v2 = 0.0;
-            extracellular_potential.v3 = 0.0;
-            extracellular_potential.v4 = 0.0;
-            extracellular_potential.v5 = 0.0;
-            extracellular_potential.v6 = 0.0;
-
-            if (idx==0){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==0){
+                extracellular_potential.la = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.la += extracellular_potential_per_workgroup[i].la;    
                 }
                 return;
             }
-            if (idx==1){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==1){
+                extracellular_potential.ra = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.ra += extracellular_potential_per_workgroup[i].ra;    
                 }
                 return;
             }
-            if (idx==2){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==2){
+                extracellular_potential.ll = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.ll += extracellular_potential_per_workgroup[i].ll;    
                 }
                 return;
             }
-            if (idx==3){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==3){
+                extracellular_potential.rl = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.rl += extracellular_potential_per_workgroup[i].rl;    
                 }
                 return;
             }
-            if (idx==4){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==4){
+                extracellular_potential.v1 = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.v1 += extracellular_potential_per_workgroup[i].v1;    
                 }
                 return;
             }
-            if (idx==5){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==5){
+                extracellular_potential.v2 = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.v2 += extracellular_potential_per_workgroup[i].v2;    
                 }
                 return;
             }
-            if (idx==6){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==6){
+                extracellular_potential.v3 = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.v3 += extracellular_potential_per_workgroup[i].v3;    
                 }
                 return;
             }
-            if (idx==7){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==7){
+                extracellular_potential.v4 = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.v4 += extracellular_potential_per_workgroup[i].v4;    
                 }
                 return;
             }
-            if (idx==8){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==8){
+                extracellular_potential.v5 = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.v5 += extracellular_potential_per_workgroup[i].v5;    
                 }
                 return;
             }
-            if (idx==9){
-                for (var i = 0u; i < ${nNodes}; i++) {
+            if (GlobalInvocationID.x==9){
+                extracellular_potential.v6 = 0.0;
+                for (var i = 0u; i < ${nWorkgroupsComputeShader2}; i++) {
                     extracellular_potential.v6 += extracellular_potential_per_workgroup[i].v6;    
                 }
                 return;
