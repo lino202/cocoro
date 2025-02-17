@@ -3,8 +3,8 @@ export function HexaFragmentShader() {
     return /*wgsl*/`
 
         struct FragUniforms {
-            lightPosition : vec4<f32>,   
-            eyePosition : vec4<f32>,
+            eyePosition : vec4<f32>,   
+            lightPosition : vec4<f32>,
         };
         @binding(2) @group(0) var<uniform> frag_uniforms : FragUniforms;
 

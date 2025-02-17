@@ -18,9 +18,7 @@ export function commonVertFragShaders(elemType) {
         ${colormapFunctions}
 
         struct VertexUniforms {
-            viewProjectionMatrix : mat4x4<f32>,
-            modelMatrix          : mat4x4<f32>,               
-            normalMatrix         : mat4x4<f32>,            
+            viewProjectionMatrix : mat4x4<f32>,       
         };
 
         struct VisualParams {
@@ -41,10 +39,10 @@ export function commonVertFragShaders(elemType) {
         @vertex
         fn vs_main (@location(0) position: vec4<f32>, @location(1) normal: vec4<f32>, @location(2) vm: f32) -> Output {    
             var output: Output;            
-            let mPosition:vec4<f32> = vertex_uniforms.modelMatrix * position; 
-            output.vPosition = mPosition;                  
-            output.vNormal =  vertex_uniforms.normalMatrix * normal;
-            output.Position = vertex_uniforms.viewProjectionMatrix * mPosition;
+            // vNormal and vPosition are only passed to the fragment shader of Hexa for line or quad these are irrelevant
+            output.vPosition = position;                  
+            output.vNormal   = normal;
+            output.Position = vertex_uniforms.viewProjectionMatrix * position;
 
             // Convert to user selected range the vm value obtained form the compute shader
             var norm_vm:f32 = (vm - visual_params.min) / (visual_params.max - visual_params.min);

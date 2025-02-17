@@ -9,12 +9,9 @@ import GraphsRenderer from '../graphs/GraphsRenderer';
 import { mat4, vec3 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
+const createCamera =require('../io/mycamera')
 
-const createCamera =require('3d-view-controls')
-
-
-
-export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesData:electrodesObj, cellObj:cellObj, li:LightInputsInterface, ensightWriter:EnsightWriter|undefined, guiCellVarGraph:GUI, guiPECGGraph:GUI) => {
+export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesData:electrodesObj, cellObj:cellObj, li:LightInputsInterface, ensightWriter:EnsightWriter|undefined, guiCellVarGraph:GUI, guiPECGGraph:GUI, isMouseStimChecked: boolean) => {
     
     // NOTES:
     // For now saving and debugging are constrainly defined before setting the sim 
@@ -116,7 +113,7 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
     const vertexRenderBuffer = device.createBuffer({
-        size: 192,
+        size: 64,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
     const fragmentUniformBuffer = device.createBuffer({
@@ -208,19 +205,12 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         }
     });
 
-    // create render uniform data (for camera control and visualization)
-    const normalMatrix = mat4.create();
-    const modelMatrix = mat4.create();
+    // create render uniform data (for camera control and visualization) and add camera
     let vMatrix = mat4.create();
     let vpMatrix = mat4.create();
     const vp = createViewProjection(gpu.canvas.width/gpu.canvas.height);
-    vpMatrix = vp.viewProjectionMatrix;
-
-    // add rotation and camera:
-    let rotation = vec3.fromValues(0, 0, 0);       
     var camera = createCamera(gpu.canvas, vp.cameraOption);
     let eyePosition = new Float32Array(vp.cameraOption.eye);
-    let lightPosition = eyePosition;
 
     device.queue.writeBuffer(colorUniformBuffer, 0, new Float32Array(li.color?.split(',').map(Number)!));
     device.queue.writeBuffer(colorUniformBuffer, 16, new Float32Array(li.specularColor?.split(',').map(Number)!));
@@ -244,7 +234,7 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
                 resource: {
                     buffer: vertexRenderBuffer,
                     offset: 0,
-                    size: 192
+                    size: 64
                 }
             },
             {
@@ -501,18 +491,11 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             const pMatrix = vp.projectionMatrix;
             vMatrix = camera.matrix;
             mat4.multiply(vpMatrix, pMatrix, vMatrix);
+            device.queue.writeBuffer(vertexRenderBuffer, 0, vpMatrix as ArrayBuffer);
 
             eyePosition = new Float32Array(camera.eye.flat());
-            lightPosition = eyePosition;
-            device.queue.writeBuffer(vertexRenderBuffer, 0, vpMatrix as ArrayBuffer);
-            device.queue.writeBuffer(fragmentUniformBuffer, 0, eyePosition);
-            device.queue.writeBuffer(fragmentUniformBuffer, 16, lightPosition);
-        
-            createTransforms(modelMatrix,[0,0,0], rotation);
-            mat4.invert(normalMatrix, modelMatrix);
-            mat4.transpose(normalMatrix, normalMatrix);
-            device.queue.writeBuffer(vertexRenderBuffer, 64, modelMatrix as ArrayBuffer);
-            device.queue.writeBuffer(vertexRenderBuffer, 128, normalMatrix as ArrayBuffer);
+            device.queue.writeBuffer(fragmentUniformBuffer, 0, eyePosition);       
+            device.queue.writeBuffer(fragmentUniformBuffer, 16, eyePosition); //the light and eye position are the same, this seems ok as it is
         }
 
         // This should be done here to change colors shown on pause

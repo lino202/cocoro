@@ -6,9 +6,8 @@ import { LightInputsInterface } from './helpers/mysettings';
 import { initGUI4UniqueCellModel, manageDataFromGUI, cellObj, blockGraphsGuiParams} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
 import { GUI } from 'dat.gui';
-import { Parser } from 'pickleparser'
+import { Parser } from 'pickleparser';
 import EnsightWriter from './io/ensightWriter';
-
 
 //  Global Variables ------------
 let li:LightInputsInterface = {};
@@ -61,7 +60,6 @@ cellVarVisualizationFolder.add(paramsCellVar, 'var_name');
 cellVarVisualizationFolder.add(paramsCellVar, 'num_points');
 cellVarVisualizationFolder.close();
 
-
 // pECG
 checkbox = document.getElementById('pECG_checkbox') as HTMLInputElement;
 checkbox.addEventListener('click', () => {toggleGraphs('pECG');});
@@ -81,7 +79,6 @@ pECGVisualizationFolder.add(paramsPECG, 'max');
 pECGVisualizationFolder.add(paramsPECG, 'num_points');
 pECGVisualizationFolder.add(paramsPECG, 'alpha_smoothing', 0, 1);
 pECGVisualizationFolder.close();
-
 
 // Functions -------------------
 
@@ -218,15 +215,18 @@ $('#btn-simulate').on('click', async ()=>{
     const cellObj:cellObj              = await manageDataFromGUI(gui, "Tissue");
     blockGraphsGuiParams(guiCellVarGraph, guiPECGGraph);
 
+    // TODO? This might be something like in for the fraphs without the canvas for setting mouse stim params before launching the simulation
+    const isMouseStimChecked = (document.getElementById('mouse_stim_checkbox') as HTMLInputElement).checked;
+
     if (meshData.elementType == "line") {
         console.log("Line Monodomain Simulation")
-        SimLineMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph)
+        SimLineMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph, isMouseStimChecked);
     }else if (meshData.elementType == "quad"){
         console.log("Quad Monodomain Simulation")
-        SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph);
+        SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph, isMouseStimChecked);
     }else if (meshData.elementType == "hexa") {
         console.log("Hexa Monodomain Simulation")
-        SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter, guiCellVarGraph, guiPECGGraph)
+        SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter, guiCellVarGraph, guiPECGGraph, isMouseStimChecked);
     }else{
         console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
     }
