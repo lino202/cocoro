@@ -2,7 +2,7 @@ import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shad
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
 import { getSecondDerivativesQuad } from './getSecondDerivativesQuad.js';
 
-export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size, saveStart, debugStart, debugStateName){
+export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size, saveStart, debugStart, debugStateName, mouseStim){
 
     var specificDefinitions;
     var specificComputeCore;
@@ -33,6 +33,20 @@ export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size, s
             debugBufferDefinition = `@binding(8) @group(0) var<storage, read_write> debug_array : array<f32>;`;
         }
         debugBufferAction = `debug_array[idx] = states[idx].` + debugStateName + `;`;
+    }
+
+    var mouseStimDefinition = ``;
+    var mouseStimAction = ``;
+    if (mouseStim){
+        var mouseStimBinding = 8;
+        if (saveStart>=0){
+            mouseStimBinding += 1;
+        }
+        if (debugStart>=0){
+            mouseStimBinding += 1;
+        }
+        mouseStimDefinition = `@binding(${mouseStimBinding}) @group(0) var<storage, read> mouse_stim : array<f32>;`;
+        mouseStimAction = `i_stim -= mouse_stim[idx];`;
     }
 
     return /*wgsl*/`
@@ -78,6 +92,7 @@ export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size, s
         @binding(7) @group(0) var<storage, read>       vms_copy : array<f32>;
         ${saveBufferDefinition}
         ${debugBufferDefinition}
+        ${mouseStimDefinition}
 
         @compute @workgroup_size(${workgroup_size})
         fn comp_monodomain_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -119,7 +134,8 @@ export function computeShaderMonodomainQuad(cellModel, nNodes, workgroup_size, s
             var i_stim:f32 = 0.0;
             if ((states[idx].t >= stim[idx].start) & (states[idx].t < stim[idx].start+stim[idx].dur)){i_stim = -stim[idx].amp;}
             if ((states[idx].t >= stim[idx].period+stim[idx].start) & (((states[idx].t - stim[idx].start) % stim[idx].period) < stim[idx].dur)){i_stim = -stim[idx].amp;}
-            
+            ${mouseStimAction}
+
             // Compute reaction/ionic term by defining the curr_Iion
             // Note: We defined Beta, Cm and the sigma_long in the constants of the cell model
             // if we think logically those are common params to the cell type that can be defining one single cell

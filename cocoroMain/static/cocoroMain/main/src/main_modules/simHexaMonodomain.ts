@@ -1,12 +1,13 @@
-import { createTransforms, createViewProjection, meshObj, electrodesObj} from '../helpers/helper';
+import { createViewProjection, meshObj, electrodesObj} from '../helpers/helper';
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { LightInputsInterface } from '../helpers/mysettings';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
 import { computeShaderMonodomainHexa } from '../tissue_shaders/simHexaMonodomainShader.js';
 import EnsightWriter from '../io/ensightWriter';
+import MouseStimHandler from '../io/mouseStimHandler';
 import GraphsRenderer from '../graphs/GraphsRenderer';
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4 } from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
 const createCamera =require('../io/mycamera')
@@ -42,7 +43,12 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
     const graphsRenderer:GraphsRenderer = new GraphsRenderer(device, gpu.textureFormat, gpu.extraCanvases, 
                                             cellObj, meshData, electrodesData, gpu.adapterLimits,
                                             guiCellVarGraph, guiPECGGraph);
-    
+
+    var mouseStim:undefined|MouseStimHandler = undefined;
+    if (isMouseStimChecked){
+        mouseStim = new MouseStimHandler(gpu.device, meshData, gpu.canvas, gpu.adapterLimits);
+    }
+
     const integ = {
         simulate: true,
         dt : 0.02,     //[ms]
@@ -436,14 +442,34 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             });
         }
     }
+
+    // add mouseStimBuffer if necessary
+    if (mouseStim instanceof MouseStimHandler){
+        var mouseStimBinding:number = 10;
+        if (saveStart>=0){
+            mouseStimBinding += 1;
+        }
+        if (debugStart>=0){
+            mouseStimBinding += 1;
+        }
+
+        computeBindGroupEntries.push({
+            binding: mouseStimBinding,
+            resource: {
+                buffer: mouseStim.mouseStimBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * mouseStim.nNodes,
+            },
+        });        
+    }
     
 
-    console.log(computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName))
+    console.log(computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName, isMouseStimChecked))
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName),
+            code: computeShaderMonodomainHexa(cellObj.cellModel, numberOfPoints, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName, isMouseStimChecked),
           }),
           entryPoint: 'comp_monodomain_main',
         },
@@ -496,6 +522,11 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             eyePosition = new Float32Array(camera.eye.flat());
             device.queue.writeBuffer(fragmentUniformBuffer, 0, eyePosition);       
             device.queue.writeBuffer(fragmentUniformBuffer, 16, eyePosition); //the light and eye position are the same, this seems ok as it is
+
+            // In case the mouse stim is set we need to update the view-projection matrix
+            if (mouseStim instanceof MouseStimHandler){
+                mouseStim.cameraUpdate(vpMatrix);
+            }
         }
 
         // This should be done here to change colors shown on pause
@@ -600,7 +631,7 @@ export const SimHexaMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         }
         if (integ.simulation_time >= debugStart && integ.simulation_time <= debugEnd && integ.simulate) {
             readDebugBuffer = device.createBuffer({
-                label: 'Read Save Buffer',
+                label: 'Read Debug Buffer',
                 size: nodeResultsSize,
                 usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
             });

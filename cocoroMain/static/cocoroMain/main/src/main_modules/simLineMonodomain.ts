@@ -1,4 +1,4 @@
-import { createTransforms, createViewProjection, meshObj, electrodesObj} from '../helpers/helper';
+import { createViewProjection, meshObj, electrodesObj} from '../helpers/helper';
 import { createGPUBufferUint, createGPUBuffer, initGPU, repeatFloat32Array } from '../helpers/helper';
 import { cellObj } from '../helpers/manageCellModelGUI';
 import { commonVertFragShaders } from '../tissue_shaders/commonVertFragShaders.js';
@@ -6,7 +6,7 @@ import { computeShaderMonodomainLine } from '../tissue_shaders/simLineMonodomain
 import EnsightWriter from '../io/ensightWriter';
 import MouseStimHandler from '../io/mouseStimHandler';
 import GraphsRenderer from '../graphs/GraphsRenderer';
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4} from 'gl-matrix';
 import { GUI } from 'dat.gui';
 import Stats from "stats.js";
 const createCamera =require('../io/mycamera')
@@ -33,8 +33,9 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
                                             cellObj, meshData, electrodesData, gpu.adapterLimits,
                                             guiCellVarGraph, guiPECGGraph);
 
+    var mouseStim:undefined|MouseStimHandler = undefined;
     if (isMouseStimChecked){
-        const mouseStim = new MouseStimHandler(gpu.canvas);
+        mouseStim = new MouseStimHandler(gpu.device, meshData, gpu.canvas, gpu.adapterLimits);
     }
     
     const integ = {
@@ -330,12 +331,32 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         }
     }
 
-    console.log(computeShaderMonodomainLine(cellObj.cellModel, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName));
+    // add mouseStimBuffer if necessary
+    if (mouseStim instanceof MouseStimHandler){
+        var mouseStimBinding:number = 6;
+        if (saveStart>=0){
+            mouseStimBinding += 1;
+        }
+        if (debugStart>=0){
+            mouseStimBinding += 1;
+        }
+
+        computeBindGroupEntries.push({
+            binding: mouseStimBinding,
+            resource: {
+                buffer: mouseStim.mouseStimBuffer,
+                offset: 0,
+                size: Float32Array.BYTES_PER_ELEMENT * mouseStim.nNodes,
+            },
+        });        
+    }
+
+    console.log(computeShaderMonodomainLine(cellObj.cellModel, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName, isMouseStimChecked));
     const computePipeline = device.createComputePipeline({
         layout: 'auto',
         compute: {
           module: device.createShaderModule({
-            code: computeShaderMonodomainLine(cellObj.cellModel, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName),
+            code: computeShaderMonodomainLine(cellObj.cellModel, numberOfVertices, workgroup_size, saveStart, debugStart, debugStateName, isMouseStimChecked),
           }),
           entryPoint: 'comp_monodomain_main',
         },
@@ -364,6 +385,12 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
             vMatrix = camera.matrix;
             mat4.multiply(vpMatrix, pMatrix, vMatrix);
             device.queue.writeBuffer(vertexRenderBuffer, 0, vpMatrix as ArrayBuffer);
+
+            // In case the mouse stim is set we need to update the view-projection matrix
+            if (mouseStim instanceof MouseStimHandler){
+                mouseStim.cameraUpdate(vpMatrix);
+            }
+            
         }
 
         // This should be done here to change colors shown on pause
@@ -460,7 +487,7 @@ export const SimLineMonodomain = async (gui:GUI, meshData:meshObj, electrodesDat
         }
         if (integ.simulation_time >= debugStart && integ.simulation_time <= debugEnd && integ.simulate) {
             readDebugBuffer = device.createBuffer({
-                label: 'Read Save Buffer',
+                label: 'Read Debug Buffer',
                 size: nodeResultsSize,
                 usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
             });

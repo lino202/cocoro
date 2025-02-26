@@ -13,7 +13,9 @@ export interface meshObj {
     connections: Uint32Array,
     fibers_long: Float32Array,
     render_points_global_ids: Uint32Array,
-    dx: number
+    dx: number,
+    vertexs_min_bb: Float32Array,
+    vertexs_max_bb: Float32Array
 }
 
 export interface electrodesObj {
@@ -162,7 +164,8 @@ export const initGPU = async () => {
             maxComputeWorkgroupSizeY:          adapterLimits.maxComputeWorkgroupSizeY,
             maxComputeWorkgroupSizeZ:          adapterLimits.maxComputeWorkgroupSizeZ,
             maxComputeWorkgroupStorageSize:    adapterLimits.maxComputeWorkgroupStorageSize,
-            maxComputeWorkgroupsPerDimension:  adapterLimits.maxComputeWorkgroupsPerDimension
+            maxComputeWorkgroupsPerDimension:  adapterLimits.maxComputeWorkgroupsPerDimension,
+            maxStorageBuffersPerShaderStage:   adapterLimits.maxStorageBuffersPerShaderStage,
         },
     }) as GPUDevice;
 

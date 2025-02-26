@@ -108,6 +108,8 @@ async function getMeshData() {
     meshData.connections               = new Uint32Array(meshData.connections);
     meshData.render_points_global_ids  = new Uint32Array(meshData.render_points_global_ids);
     meshData.fibers_long               = new Float32Array(meshData.fibers_long);
+    meshData.vertexs_max_bb            = new Float32Array(meshData.vertexs_max_bb);
+    meshData.vertexs_min_bb            = new Float32Array(meshData.vertexs_min_bb);
 
     return meshData;    
 

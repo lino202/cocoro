@@ -244,7 +244,7 @@ def parseMesh(binaryData):
         quad_to_tri_filter.SetInputData(renderMesh)
         quad_to_tri_filter.Update()
         renderMesh = quad_to_tri_filter.GetOutput()
-        # saveVtkPolyMesh(renderMesh, "renderMesh")
+        saveVtkPolyMesh(renderMesh, "renderMesh")
     else:
         renderMesh = mesh
         
@@ -257,6 +257,7 @@ def parseMesh(binaryData):
     dx = np.max(np.abs(np.round(vertexs[0,:]).astype(int) - np.round(vertexs[1,:]).astype(int)))
 
     # Normalize vertexs to -1 to 1
+    norm_dx = ((dx - vertexs.min()) / (vertexs.max() - vertexs.min())) * 2   # no need to substract 1
     vertexs = (vertexs - vertexs.min()) / (vertexs.max() - vertexs.min())
     vertexs = (vertexs * 2) - 1
 
@@ -360,6 +361,19 @@ def parseMesh(binaryData):
         fibers_long = np.zeros((mesh.GetNumberOfPoints(),3))
         fibers_long[:,0] = 1
 
+    # For the line we add a dx thick parallelepiped because if we have the mouse stim is impossible to get 
+    # the stim to be inside the bounding box
+    if (elementType == 'line'):
+        vertexs_min_bb = np.min(vertexs, axis=0)
+        vertexs_max_bb = np.max(vertexs, axis=0)
+
+        # It does not matter if we go out the clip space as this bounding box is used for mouse click determination
+        vertexs_min_bb -= norm_dx
+        vertexs_max_bb += norm_dx
+    else:
+        vertexs_min_bb = np.min(vertexs, axis=0)
+        vertexs_max_bb = np.max(vertexs, axis=0)
+
     #Get all as one dimensional list for passing to json and js
     # TODO we are importing/saving so much data, this can block the page if the mesh is too big
     # the data saved can be reduced and connections can be computed in the gpu I assume pretty fast
@@ -372,10 +386,13 @@ def parseMesh(binaryData):
     connections    = connections.flatten().tolist()
     fibers_long    = fibers_long.flatten().tolist()
     render_points_global_ids = render_points_global_ids.flatten().tolist()
+    vertexs_min_bb = vertexs_min_bb.tolist()
+    vertexs_max_bb = vertexs_max_bb.tolist()
+    
 
     parsed = {'vertexs': vertexs, 'actual_points': actual_points, 'actual_elems': actual_elems, 'render_elems': render_elems, 'normals': normals, 'elementType': elementType, 
                            'stim_params': stim_params, 'connections': connections, 'fibers_long': fibers_long, 'dx': int(dx), #dx is a numpy.int -> problems with pickle parses so int
-                           'render_points_global_ids': render_points_global_ids}
+                           'render_points_global_ids': render_points_global_ids, 'vertexs_min_bb': vertexs_min_bb, 'vertexs_max_bb': vertexs_max_bb }
 
     return parsed
 
