@@ -23,7 +23,7 @@ export function getSecondDerivativesHexa(nNodes){
             (_i1_j_1k  < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_i_1j_1k  < ${nNodes}) & (_1i_1j_1k < ${nNodes}) & (_1i_j_1k  < ${nNodes}) &
             (_1i_j1_1k < ${nNodes})) {
 
-            // here I am in the center of domain
+            // here we are in the center of domain
             d2dxdx_V = (vms_copy[_1i_j_k] - 2 * vms_copy[idx] + vms_copy[_i1_j_k]) / pow(integ.dx,2);
             d2dydy_V = (vms_copy[_i_1j_k] - 2 * vms_copy[idx] + vms_copy[_i_j1_k]) / pow(integ.dx,2);
             d2dzdz_V = (vms_copy[_i_j_1k] - 2 * vms_copy[idx] + vms_copy[_i_j_k1]) / pow(integ.dx,2);
@@ -33,7 +33,7 @@ export function getSecondDerivativesHexa(nNodes){
 
         
         }else{
-            // Here I am in anywhere in the domain's boundary
+            // Here we are in anywhere in the domain's boundary
             ${wgsl_hexa_d2dxdx_V}
             ${wgsl_hexa_d2dydy_V}
             ${wgsl_hexa_d2dzdz_V}

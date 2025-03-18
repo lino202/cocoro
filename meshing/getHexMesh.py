@@ -88,7 +88,7 @@ def main():
 
     cells = [("hexahedron", newElems)]
     mesh = meshio.Mesh(newPoints, cells=cells)
-    mesh.write(os.path.join(args.outPath, "mesh_hex.vtk"))
+    mesh.write(args.outPath)
 
 #REMEMBER
 # Use paraview for surface extraction and triangulation of the surface.

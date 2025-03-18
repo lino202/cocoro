@@ -2,17 +2,32 @@ export function hexa_d2dxdz_V(nNodes){
     
     return /*wgsl*/`
 
-        if ( (_i1_j_k1 < ${nNodes}) & (_1i_j_k1 < ${nNodes}) & (_i1_j_1k < ${nNodes}) & (_1i_j_1k < ${nNodes})) {
-            // central, if all are available we are in plane so neumann condition not necessary there
-            d2dxdz_V = (vms_copy[_i1_j_k1] - vms_copy[_1i_j_k1] - vms_copy[_i1_j_1k] + vms_copy[_1i_j_1k] ) / (4 * pow(integ.dx, 2));
-        
-        // Now we have 12 cases (4 corners defining the derivative that can or can not be present 
-        // So 2^4 = 16 but 4 cases are not possible, all present, none present, just two diagonals present) TODO check implementation
-        // all to zero for now, I know how to make the dxdy for the different cases taking fordward or backward FD but how to add
-        // the neumann condition as Elvio thesis.
+        // We use the mirroring technique for generating ghost nodes when the node potential is not available
+        // Similarly as for the quad
+        var diag1_dxdz:f32 = 0.0;
+        var diag2_dxdz:f32 = 0.0;
+
+        if ( (_i1_j_k1 < ${nNodes}) & (_1i_j_1k < ${nNodes}) ){
+            diag1_dxdz = vms_copy[_i1_j_k1] + vms_copy[_1i_j_1k];
+        }else if (_i1_j_k1 < ${nNodes}){
+            diag1_dxdz = 2 * vms_copy[_i1_j_k1];
+        }else if (_1i_j_1k < ${nNodes}){
+            diag1_dxdz = 2 * vms_copy[_1i_j_1k];
         }else{
-            d2dxdz_V = 0.0;
+            diag1_dxdz = 0.0; //You can be here in the case of outer corner!! ATTENTION
         }
+
+        if ( (_1i_j_k1 < ${nNodes}) & (_i1_j_1k < ${nNodes}) ){
+            diag2_dxdz = vms_copy[_1i_j_k1] + vms_copy[_i1_j_1k];
+        }else if (_1i_j_k1 < ${nNodes}){
+            diag2_dxdz = 2 * vms_copy[_1i_j_k1];
+        }else if (_i1_j_1k < ${nNodes}){
+            diag2_dxdz = 2 * vms_copy[_i1_j_1k];
+        }else{
+            diag2_dxdz = 0.0; //You can be here in the case of outer corner!! ATTENTION
+        }
+
+        d2dxdz_V = (diag1_dxdz - diag2_dxdz) / (4 * pow(integ.dx,2));
 
     `;
 }

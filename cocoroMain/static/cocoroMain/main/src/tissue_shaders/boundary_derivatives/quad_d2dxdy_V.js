@@ -2,63 +2,34 @@ export function quad_d2dxdy_V(nNodes){
     
     return /*wgsl*/`
 
-        // There is 12 possible cases
-        // Holes of 1 square width in x or y are not allowed, as well as nodes representing regions with zero volumen as two squares in diagonal. 
-        // TODO the problem with hole of 1 square width is due to we use the distance for defining the connections we need to use vtk cell2points o points2cells as per Hexa
+        // There are 12 possible cases
+        // We use the mirroring technique for generating ghost nodes when the node potential is not available
+        // For the 4 nodes in the corners of the stencil we have 12 cases, (4*4=16 but 4 cases are not possible or already took into account)
+        // The 4 not possible cases are: all present, none present, just two diagonals present (2 cases)
+        // Moreover the d2dxdy_V central scheme aproximation takes into account the corner values, we can separate this in diag1 and diag2 to ease the code
+        var diag1:f32 = 0.0;
+        var diag2:f32 = 0.0;
 
-        // TODO CHECK!!! There are implementations that I am not sure of...
-        // For example in the bottom left corner, I use fordward finite differences and according neuman i,j = i+1 and at the same time i,j = i,j+1
-        // so I have written the d2dxdy = i+1,j+1 - i+1,j - i,j+1 + i,j ==> i+1,j+1 - i,j, (!!! attention we use i,j as it should be equal to i+1,j and i,j+1 )
-        // is this right?
-        
-        if ( (_i_j1 < ${nNodes}) & (_i1_j1 <  ${nNodes}) & (_i1_j <  ${nNodes}) & (_i1_1j <  ${nNodes}) & 
-             (_i_1j < ${nNodes}) & (_1i_1j >= ${nNodes}) & (_1i_j >= ${nNodes}) & (_1i_j1 >= ${nNodes}) ) {
-            // CASE 1 left boundary
-            d2dxdy_V = (vms_copy[_i1_j1] - vms_copy[_i1_1j]) / (2 * pow(integ.dx,2));
-
-        }else if ( (_i_j1 < ${nNodes}) & (_i1_j1 >= ${nNodes}) & (_i1_j >= ${nNodes}) & (_i1_1j >= ${nNodes}) & 
-                   (_i_1j < ${nNodes}) & (_1i_1j <  ${nNodes}) & (_1i_j <  ${nNodes}) & (_1i_j1 <  ${nNodes}) ) {
-            // CASE 2 right boundary
-            d2dxdy_V = (vms_copy[_1i_1j] - vms_copy[_1i_j1]) / (2 * pow(integ.dx,2));
-        
-        }else if ( (_i_j1 >= ${nNodes}) & (_i1_j1 >= ${nNodes}) & (_i1_j < ${nNodes}) & (_i1_1j <  ${nNodes}) & 
-                   (_i_1j <  ${nNodes}) & (_1i_1j <  ${nNodes}) & (_1i_j < ${nNodes}) & (_1i_j1 >= ${nNodes}) ) {
-            // CASE 3 top boundary
-            d2dxdy_V = (vms_copy[_1i_1j] - vms_copy[_i1_1j]) / (2 * pow(integ.dx,2));
-        
-        }else if ( (_i_j1 <  ${nNodes}) & (_i1_j1 <  ${nNodes}) & (_i1_j < ${nNodes}) & (_i1_1j >= ${nNodes}) & 
-                   (_i_1j >= ${nNodes}) & (_1i_1j >= ${nNodes}) & (_1i_j < ${nNodes}) & (_1i_j1 <  ${nNodes}) ) {
-            // CASE 4 bottom boundary 
-            d2dxdy_V = (vms_copy[_i1_j1] - vms_copy[_1i_j1]) / (2 * pow(integ.dx,2));
-
-        }else if ( (_i_j1 <  ${nNodes}) & (_i1_j1 <  ${nNodes}) & (_i1_j <  ${nNodes}) & (_i1_1j >= ${nNodes}) & 
-                   (_i_1j >= ${nNodes}) & (_1i_1j >= ${nNodes}) & (_1i_j >= ${nNodes}) & (_1i_j1 >= ${nNodes}) ) {
-            // CASE 5 outer bottom-left corner 
-            d2dxdy_V = (vms_copy[_i1_j1] - vms_copy[idx]) / pow(integ.dx,2);
-        
-        }else if ( (_i_j1 <  ${nNodes}) & (_i1_j1 >= ${nNodes}) & (_i1_j >= ${nNodes}) & (_i1_1j >= ${nNodes}) & 
-                   (_i_1j >= ${nNodes}) & (_1i_1j >= ${nNodes}) & (_1i_j <  ${nNodes}) & (_1i_j1 <  ${nNodes}) ) {
-            // CASE 6 outer bottom-right corner 
-            d2dxdy_V = (vms_copy[idx] - vms_copy[_1i_j1]) / pow(integ.dx,2);
-        
-        }else if ( (_i_j1 >= ${nNodes}) & (_i1_j1 >= ${nNodes}) & (_i1_j >= ${nNodes}) & (_i1_1j >= ${nNodes}) & 
-                   (_i_1j <  ${nNodes}) & (_1i_1j <  ${nNodes}) & (_1i_j <  ${nNodes}) & (_1i_j1 >= ${nNodes}) ) {
-            // CASE 7 outer top-right corner 
-            d2dxdy_V = (vms_copy[_1i_1j] - vms_copy[idx]) / pow(integ.dx,2);
-
-        }else if ( (_i_j1 >= ${nNodes}) & (_i1_j1 >= ${nNodes}) & (_i1_j <  ${nNodes}) & (_i1_1j <  ${nNodes}) & 
-                   (_i_1j <  ${nNodes}) & (_1i_1j >= ${nNodes}) & (_1i_j >= ${nNodes}) & (_1i_j1 >= ${nNodes}) ) {
-            // CASE 8 outer top-left corner     
-            d2dxdy_V = (vms_copy[idx] - vms_copy[_i1_1j]) / pow(integ.dx,2);
-        
+        if ( (_i1_j1 < ${nNodes}) & (_1i_1j < ${nNodes}) ){
+            diag1 = vms_copy[_i1_j1] + vms_copy[_1i_1j];
+        }else if (_i1_j1 < ${nNodes}){
+            diag1 = 2 * vms_copy[_i1_j1];
+        }else if (_1i_1j < ${nNodes}){
+            diag1 = 2 * vms_copy[_1i_1j];
         }else{
-            // TODO check how to correctly do this implementation, for now all zero
-            // CASE 9 inner bottom-left corner 
-            // CASE 10 inner bottom-right corner    
-            // CASE 11 inner top-right corner
-            // CASE 12 inner top-left corner
-            d2dxdy_V = 0.0;
+            diag1 = 0.0; //You can be here in the case of outer corner!! ATTENTION
         }
 
+        if ( (_1i_j1 < ${nNodes}) & (_i1_1j < ${nNodes}) ){
+            diag2 = vms_copy[_1i_j1] + vms_copy[_i1_1j];
+        }else if (_1i_j1 < ${nNodes}){
+            diag2 = 2 * vms_copy[_1i_j1];
+        }else if (_i1_1j < ${nNodes}){
+            diag2 = 2 * vms_copy[_i1_1j];
+        }else{
+            diag2 = 0.0; //You can be here in the case of outer corner!! ATTENTION
+        }
+
+        d2dxdy_V = (diag1 - diag2) / (4 * pow(integ.dx,2));
     `;
 }
