@@ -1,19 +1,23 @@
 
 import { renderCellVarGraphVertexShader, renderCellVarGraphFragmentShader, renderCellVarGraphComputeShader } from './CellVarGraphShaders';
-import { createGPUBuffer, createGPUBufferUint} from '../helpers/helper';
-import { cellObj } from '../helpers/manageCellModelGUI';
+import { CellObj } from '../helpers/interfaces';
 import { GUI } from 'dat.gui';
 
-class CellVarGraph {
+abstract class CellVarGraph {
+    // This abstract class inherits to a Cell and Tissue version for plotting in a 1D graph
+    // cell level information in the cellular and tissue simulations. 
+    // For rendering we needed a compute and render shaders, the former shift the values in time avoiding data races
+    // by using a copy the 1D signal for updating the new signal to plot
+    // and the second renders the 1D signal using line primitives
     
     device: GPUDevice;
     canvas: HTMLCanvasElement;
     textureFormat: GPUTextureFormat;
     gui: GUI;
+    nNodes   : number;
     numPoints: number;
     min: number;
     max: number;
-    nodeIdx: number;
     varName: string;
     context: GPUCanvasContext;
     renderPipeline: GPURenderPipeline;
@@ -26,32 +30,41 @@ class CellVarGraph {
     voiBufferCopy       : GPUBuffer;
     visualParamsBuffer  : GPUBuffer;
     nodeIdxBuffer       : GPUBuffer;
-    cellObj             : cellObj;
-    nNodes              : number;
+    cellObj             : CellObj;
     workgroupSize       : number;
     computeBindGroup: GPUBindGroup | null = null;
     statesBuffer: GPUBuffer | null = null;
+    computeBindGroupEntries : GPUBindGroupEntry[];
 
-    constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:cellObj, nNodes:number,
-        gui:GUI, workgroupSize:number=64) {
+    constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:CellObj, nNodes:number, gui:GUI, workgroupSize:number=64) {
         this.device = device;
         this.textureFormat = textureFormat;
-        this.canvas = canvas;
-        this.gui = gui;
-        this.min = gui.__folders.Visualization.__controllers[0].getValue();
-        this.max = gui.__folders.Visualization.__controllers[1].getValue();
-        this.nodeIdx = gui.__folders.Visualization.__controllers[2].getValue();
-        this.varName = gui.__folders.Visualization.__controllers[3].getValue();
-        this.numPoints = gui.__folders.Visualization.__controllers[4].getValue();
-        this.cellObj = cellObj;
-        this.nNodes    = nNodes;
+        this.canvas        = canvas;
+        this.gui           = gui;
+        this.cellObj       = cellObj;
+        this.nNodes        = nNodes;
         this.workgroupSize = workgroupSize;
 
-        if ((this.nodeIdx<0) || (this.nodeIdx>=this.nNodes)){
-            // Do not be stupid do not throw an error -> the graph will only show a constant value
-            // throw new Error(`The selected node ${this.nodeIdx} is out of range of a mesh with ${this.nNodes} nodes`)
-            console.log(`The selected node ${this.nodeIdx} is out of range for a mesh with ${this.nNodes} nodes`)
-        }
+        // Init gui based attributes
+        const minController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "min")
+        if (minController === undefined){ throw Error(`GUI controller min not found!`)}
+        this.min = minController.getValue();
+        minController.onChange((value) => {this.min = value;});
+
+        const maxController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "max")
+        if (maxController === undefined){ throw Error(`GUI controller max not found!`)}
+        this.max = maxController.getValue();
+        maxController.onChange((value) => {this.max = value;});
+
+        const varNameController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "var_name")
+        if (varNameController === undefined){ throw Error(`GUI controller var_name not found!`)}
+        this.varName = varNameController.getValue();
+        // varNameController.onChange((value) => {this.varName = value;}); not necessary this does not change once the computing is up
+        
+        const numPointsController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "num_points")
+        if (numPointsController === undefined){ throw Error(`GUI controller num_points not found!`)}
+        this.numPoints = numPointsController.getValue();
+        // numPointsController.onChange((value) => {this.numPoints = value;}); not necessary this does not change once the computing is up
 
         // INIT RENDERING
         const devicePixelRatio = window.devicePixelRatio || 1;
@@ -137,10 +150,35 @@ class CellVarGraph {
             throw new Error(`${this.varName} is not a state variable of model ${this.cellObj.cellModel}`)
         }
         this.numberOfIndexes  = indexs.length;
-        this.xCoordsBuffer    = createGPUBuffer(this.device, xcoords);
-        this.indexBuffer      = createGPUBufferUint(this.device, indexs);
-        this.voiBuffer        = createGPUBuffer(this.device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-        this.voiBufferCopy    = createGPUBuffer(this.device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);  // this avoids dara race
+        
+        this.xCoordsBuffer = this.device.createBuffer({
+            label: "CellVarGraph_xCoordsBuffer",
+            size: xcoords.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.xCoordsBuffer, 0, xcoords);
+        
+        this.voiBuffer = this.device.createBuffer({
+            label: "CellVarGraph_voiBuffer",
+            size: voiInitValues.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.voiBuffer, 0, voiInitValues);
+
+        // this avoids dara race
+        this.voiBufferCopy = this.device.createBuffer({
+            label: "CellVarGraph_voiBufferCopy",
+            size: voiInitValues.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.voiBufferCopy, 0, voiInitValues);
+
+        this.indexBuffer = this.device.createBuffer({
+            label: 'CellVarGraph_indexBuffer',
+            size: indexs.byteLength,
+            usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+        });
+        this.device.queue.writeBuffer(this.indexBuffer, 0, indexs);
 
         // ExtraBuffers
         const visualParamsArray = new Float32Array([this.min, this.max]);
@@ -166,6 +204,43 @@ class CellVarGraph {
                 entryPoint: 'comp_main',
             },
         });
+
+
+        this.computeBindGroupEntries = [
+            {
+                binding: 0,
+                resource: {
+                    buffer: this.voiBuffer,
+                    offset: 0,
+                    size: Float32Array.BYTES_PER_ELEMENT * this.numPoints,
+                },
+            },
+            {
+                binding: 1,
+                resource: {
+                    buffer: this.visualParamsBuffer,
+                    offset: 0,
+                    size: Float32Array.BYTES_PER_ELEMENT * 2,  //min and max
+                },
+            },
+            {
+                binding: 2,
+                resource: {
+                    buffer: this.voiBufferCopy,
+                    offset: 0,
+                    size: Float32Array.BYTES_PER_ELEMENT * this.numPoints,
+                },
+            },
+            {
+                binding: 3,
+                resource: {
+                    buffer: this.nodeIdxBuffer,
+                    offset: 0,
+                    size: Uint32Array.BYTES_PER_ELEMENT,
+                },
+            }
+        ];
+    
 
     }
 
@@ -195,53 +270,22 @@ class CellVarGraph {
         
         this.statesBuffer = statesBuffer;
 
+        this.computeBindGroupEntries.push({
+            binding: this.computeBindGroupEntries.length,
+            resource: {
+                buffer: this.statesBuffer,
+                offset: 0,
+                size: statesByteLength,
+            },
+        });
+
         this.computeBindGroup = this.device.createBindGroup({
             label: 'CellVarGraph_ComputeBindGroup',
             layout: this.computePipeline.getBindGroupLayout(0),
-                entries: [
-                    {
-                        binding: 0,
-                        resource: {
-                            buffer: this.voiBuffer,
-                            offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * this.numPoints,
-                        },
-                    },
-                    {
-                        binding: 1,
-                        resource: {
-                            buffer: this.statesBuffer,
-                            offset: 0,
-                            size: statesByteLength,
-                        },
-                    },
-                    {
-                        binding: 2,
-                        resource: {
-                            buffer: this.visualParamsBuffer,
-                            offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * 2,  //min and max
-                        },
-                    },
-                    {
-                        binding: 3,
-                        resource: {
-                            buffer: this.nodeIdxBuffer,
-                            offset: 0,
-                            size: Uint32Array.BYTES_PER_ELEMENT,
-                        },
-                    },
-                    {
-                        binding: 4,
-                        resource: {
-                            buffer: this.voiBufferCopy,
-                            offset: 0,
-                            size: Float32Array.BYTES_PER_ELEMENT * this.numPoints,
-                        },
-                    }
-                ],
+                entries: this.computeBindGroupEntries,
         });
     }
+
 
     render(commandEncoder: GPUCommandEncoder){
 
@@ -249,16 +293,9 @@ class CellVarGraph {
             this.visualParamsBuffer,
             0,
             new Float32Array([
-                this.gui.__folders.Visualization.__controllers[0].getValue(),   
-                this.gui.__folders.Visualization.__controllers[1].getValue()
+                this.min,   
+                this.max
             ])
-        );
-        
-        this.nodeIdx = this.gui.__folders.Visualization.__controllers[2].getValue()
-        this.device.queue.writeBuffer(
-            this.nodeIdxBuffer,
-            0,
-            new Uint32Array([this.nodeIdx]) //Is neccesary to make a UintArray even if it is one element
         );
 
         {   //Compute Update

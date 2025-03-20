@@ -2,7 +2,7 @@ import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shad
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
 import { getSecondDerivativesHexa } from './getSecondDerivativesHexa.js';
 
-export function computeShaderMonodomainHexa(cellModel, nNodes, nVertexs, workgroup_size, saveStart, debugStart, debugStateName, mouseStim){
+export function computeShaderMonodomainHexa(cellModel, nNodes, nVertexs, workgroup_size, saveStart, debugStart, debugStateName, mouseStim, bindingNumber){
 
     var specificDefinitions;
     var specificComputeCore;
@@ -22,16 +22,16 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, nVertexs, workgro
     var saveBufferDefinition = ``;
     var saveBufferAction = ``;
     if (saveStart >= 0){
-        saveBufferDefinition = `@binding(10) @group(0) var<storage, read_write> save_array : array<f32>;`;
+        saveBufferDefinition = `@binding(${bindingNumber}) @group(0) var<storage, read_write> save_array : array<f32>;`;
         saveBufferAction = `save_array[idx] = states[idx].vm;`;
     }
     var debugBufferDefinition = ``;
     var debugBufferAction = ``;
     if (debugStart >= 0){
         if (saveStart >= 0){
-            debugBufferDefinition = `@binding(11) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+            debugBufferDefinition = `@binding(${bindingNumber+1}) @group(0) var<storage, read_write> debug_array : array<f32>;`;
         }else{
-            debugBufferDefinition = `@binding(10) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+            debugBufferDefinition = `@binding(${bindingNumber}) @group(0) var<storage, read_write> debug_array : array<f32>;`;
         }
         debugBufferAction = `debug_array[idx] = states[idx].` + debugStateName + `;`;
     }
@@ -39,7 +39,7 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, nVertexs, workgro
     var mouseStimDefinition = ``;
     var mouseStimAction = ``;
     if (mouseStim){
-        var mouseStimBinding = 10;
+        var mouseStimBinding = bindingNumber;
         if (saveStart>=0){
             mouseStimBinding += 1;
         }
@@ -103,14 +103,14 @@ export function computeShaderMonodomainHexa(cellModel, nNodes, nVertexs, workgro
         ${specificDefinitions}
 
         @binding(0) @group(0) var<storage, read_write> vms           : array<f32, ${nNodes}>;
-        @binding(1) @group(0) var<storage, read>       vms_copy      : array<f32, ${nNodes}>;
-        @binding(2) @group(0) var<storage, read_write> vms_vertexs   : array<f32, ${nVertexs}>;
-        @binding(3) @group(0) var<storage, read>       stim          : array<Stim, ${nNodes}>;
-        @binding(4) @group(0) var<storage, read_write> states        : array<States, ${nNodes}>;
-        @binding(5) @group(0) var<storage, read>       fibers_orient : array<FiberOrientation, ${nNodes}>;
-        @binding(6) @group(0) var<storage, read>       connections   : array<Connections, ${nNodes}>;
-        @binding(7) @group(0) var<uniform>             constants     : Constants;
-        @binding(8) @group(0) var<uniform>             integ         : Integration;
+        @binding(1) @group(0) var<storage, read>       stim          : array<Stim, ${nNodes}>;
+        @binding(2) @group(0) var<storage, read_write> states        : array<States, ${nNodes}>;
+        @binding(3) @group(0) var<uniform>             constants     : Constants;
+        @binding(4) @group(0) var<uniform>             integ         : Integration;
+        @binding(5) @group(0) var<storage, read>       vms_copy      : array<f32, ${nNodes}>;
+        @binding(6) @group(0) var<storage, read>       fibers_orient : array<FiberOrientation, ${nNodes}>;
+        @binding(7) @group(0) var<storage, read>       connections   : array<Connections, ${nNodes}>;
+        @binding(8) @group(0) var<storage, read_write> vms_vertexs   : array<f32, ${nVertexs}>;
         @binding(9) @group(0) var<storage, read>       render_points : array<u32>;
         ${saveBufferDefinition}
         ${debugBufferDefinition}

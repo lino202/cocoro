@@ -1,7 +1,7 @@
 import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from '../cellular_shaders/fenton_karma_wgsl.js'
 import { gaurDefinitions, gaurCoreCompute} from '../cellular_shaders/gaur_wgsl.js'
 
-export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, saveStart, debugStart, debugStateName, mouseStim) {
+export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, saveStart, debugStart, debugStateName, mouseStim, bindingNumber) {
 
     var specificDefinitions;
     var specificComputeCore;
@@ -19,16 +19,16 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, s
     var saveBufferDefinition = ``;
     var saveBufferAction = ``;
     if (saveStart >= 0){
-        saveBufferDefinition = `@binding(6) @group(0) var<storage, read_write> save_array : array<f32>;`;
+        saveBufferDefinition = `@binding(${bindingNumber}) @group(0) var<storage, read_write> save_array : array<f32>;`;
         saveBufferAction = `save_array[idx] = states[idx].vm;`;
     }
     var debugBufferDefinition = ``;
     var debugBufferAction = ``;
     if (debugStart >= 0){
         if (saveStart >= 0){
-            debugBufferDefinition = `@binding(7) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+            debugBufferDefinition = `@binding(${bindingNumber+1}) @group(0) var<storage, read_write> debug_array : array<f32>;`;
         }else{
-            debugBufferDefinition = `@binding(6) @group(0) var<storage, read_write> debug_array : array<f32>;`;
+            debugBufferDefinition = `@binding(${bindingNumber}) @group(0) var<storage, read_write> debug_array : array<f32>;`;
         }
         debugBufferAction = `debug_array[idx] = states[idx].` + debugStateName + `;`;
     }
@@ -36,7 +36,7 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, s
     var mouseStimDefinition = ``;
     var mouseStimAction = ``;
     if (mouseStim){
-        var mouseStimBinding = 6;
+        var mouseStimBinding = bindingNumber;
         if (saveStart>=0){
             mouseStimBinding += 1;
         }
@@ -64,7 +64,7 @@ export function computeShaderMonodomainLine(cellModel, nNodes, workgroup_size, s
         ${specificDefinitions}
 
         @binding(0) @group(0) var<storage, read_write> vms : array<f32>;
-        @binding(1) @group(0) var<storage, read_write> stim : array<Stim, ${nNodes}>;
+        @binding(1) @group(0) var<storage, read>       stim : array<Stim, ${nNodes}>;
         @binding(2) @group(0) var<storage, read_write> states : array<States, ${nNodes}>;
         @binding(3) @group(0) var<uniform>             constants : Constants;
         @binding(4) @group(0) var<uniform>             integ : Integration;

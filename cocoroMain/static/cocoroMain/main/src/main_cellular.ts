@@ -1,17 +1,20 @@
 
 
 import { checkWebGPU } from './helpers/helper';
-import { SimCell } from './main_modules/simCell';
-import {initGUI4UniqueCellModel, manageDataFromGUI, cellObj } from './helpers/manageCellModelGUI';
+import { CellObj } from './helpers/interfaces'
+import CellSim from './main_modules/CellSim';
+import {initGUI4UniqueCellModel, manageDataFromGUI } from './helpers/manageCellModelGUI';
 import { GUI } from 'dat.gui';
 import $ from 'jquery';
 
 //  Global Variables ------------
+// these variables can be changed by the user before starting the simulation
 const visualParams = {
     min   : -100,
     max   : 60,
-    plot_dt  : 0.2,     // This should be in ms if dt is in ms
+    var_name: 'vm',
     num_points : 10000,
+    plot_dt  : 0.2,     // This should be in ms if dt is in ms and in last position
 }
 const gpuSettings = {
     workgroup_size   : 64,
@@ -42,8 +45,11 @@ $(document).ready(function(){
     initGUI4UniqueCellModel(gui, gpuSettings, visualParams, 'Cellular', saveSettings, debugSettings);
 });
 
-$('#btn-simulate').on('click',()=>{
+$('#btn-simulate').on('click',async ()=>{
 
-    var cellObj:cellObj = manageDataFromGUI(gui);
-    SimCell(gui, cellObj.cellModel, cellObj.states, cellObj.constants, cellObj.stim, visualParams);
+    var cellObj:CellObj = manageDataFromGUI(gui);
+
+    // Init simulator and start simulation
+    const simulator:CellSim = await CellSim.create(gui, cellObj);
+    requestAnimationFrame(simulator.simulate);
 });

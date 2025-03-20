@@ -25,10 +25,11 @@ export function renderCellVarGraphComputeShader(cellModel, nNodes, nVertexs, var
         };
 
         @binding(0) @group(0) var<storage, read_write> vois : array<f32>; //nVertexs here gives error with function ArrayLength -> it produces no constructor match
-        @binding(1) @group(0) var<storage, read>       states : array<States, ${nNodes}>;
-        @binding(2) @group(0) var<storage, read>       visualization : VisualParams;
+        @binding(1) @group(0) var<storage, read>       visualization : VisualParams;
+        @binding(2) @group(0) var<storage, read>       vois_copy : array<f32>;
         @binding(3) @group(0) var<storage, read>       node_idx : u32;
-        @binding(4) @group(0) var<storage, read>       vois_copy : array<f32>;
+        @binding(4) @group(0) var<storage, read>       states : array<States, ${nNodes}>;
+                
 
         @compute @workgroup_size(${workgroup_size})
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {

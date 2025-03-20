@@ -1,4 +1,4 @@
-import { meshObj } from '../helpers/helper';
+import { MeshObj } from '../helpers/interfaces';
 
 class EnsightWriter {
     // This class is used to write the geometry, animation and states files in the Ensight format.
@@ -46,7 +46,7 @@ class EnsightWriter {
         }
     }
 
-    async saveGeometry(meshData:meshObj):Promise<void> {
+    async saveGeometry(meshData:MeshObj):Promise<void> {
 
         // check if folderHandler is defined
         if (this.folderHandler == null) {

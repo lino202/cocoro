@@ -1,15 +1,11 @@
 import {cellTypesFK, cellModelParamsFKBR, cellModelParamsFKMBR, cellModelParamsFKGP, cellModelParamsFKMLR1} from '../cellular_definitions/fenton_karma_init'
 import {cellTypesGaur, cellModelParamsGaur} from '../cellular_definitions/gaur_init'
 import { GUI } from 'dat.gui';
-import { debugSettingsObj, saveSettingsObj } from './helper';
+import { DebugSettingsObj, SaveSettingsObj, VisualParams, CellObj } from './interfaces';
 
-export interface cellObj {
-    cellModel: string,
-    states: Record<string,number>,
-    constants: Record<string,number>,
-    stim: Record<string,number>
-}
-
+// TODO in this file all functions use numbers to point to the right controller in the GUI
+// this is fucked! maybe try something like __controllers.find(c => c.property === "name") as done in other sides of the code
+// for now we leave it like that as this one day should be OOP code 
 
 function changeCellModel(newCellModel:string, gui: GUI, simScale:string="Cellular",): void {
     gui.__folders.IonicParams.remove(gui.__folders.IonicParams.__controllers[1])
@@ -95,7 +91,7 @@ function changeCellTypes(newCellType:string, gui:GUI, simScale:string = "Cellula
 
 }
 
-export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,number>, visualParams:Record<string,number>, simScale:string="Cellular", saveSettings:saveSettingsObj, debugSettings:debugSettingsObj): void {
+export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,number>, visualParams:VisualParams, simScale:string="Cellular", saveSettings:SaveSettingsObj, debugSettings:DebugSettingsObj): void {
     var cellModelsGui = { Cell_Model: 'Fenton_Karma'}
     var cellModelsType = { Cell_Type: 'BR'}
 
@@ -113,20 +109,12 @@ export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,numbe
     const constantsFolder = simGUIFolder.addFolder('Constants');
     Object.keys(cellModelParamsFKBR.constants).forEach((k) => {constantsFolder.add(cellModelParamsFKBR.constants, k);});
 
-    const visualGUIFolder      = gui.addFolder('Visualization');
     if (simScale == "Cellular"){
         var stimFolder:GUI = simGUIFolder.addFolder('Stim');
-        Object.keys(cellModelParamsFKBR.stim).forEach((k) => {stimFolder.add(cellModelParamsFKBR.stim, k);});
-
-        // Stupid thing having state variable to be selected in the plot of cell sim
-        // because visualParams do not admit string:string as the code is done now
-        // we need to change this when we make the code OOP
-        var visualParamsWithVarName = { ...visualParams, var_name: 'vm' }
-        Object.keys(visualParamsWithVarName).forEach((k) => {visualGUIFolder.add(visualParamsWithVarName, k);});
-    }else{
-        Object.keys(visualParams).forEach((k) => {visualGUIFolder.add(visualParams, k);});
-
+        Object.keys(cellModelParamsFKBR.stim).forEach((k) => {stimFolder.add(cellModelParamsFKBR.stim, k);})
     }
+    const visualGUIFolder      = gui.addFolder('Visualization');
+    Object.keys(visualParams).forEach((k) => {visualGUIFolder.add(visualParams, k);});
 
     const saveGUIFolder = gui.addFolder('Save');
     const debugGUIFolder = gui.addFolder('Debug');
@@ -136,7 +124,7 @@ export function initGUI4UniqueCellModel(gui:GUI, gpuSettings:Record<string,numbe
 }
 
 
-export function manageDataFromGUI(gui: GUI, simScale:string="Cellular"): cellObj{
+export function manageDataFromGUI(gui: GUI): CellObj{
     var cellModelController = gui.__folders.IonicParams.__controllers[0];
     var cellTypeController  = gui.__folders.IonicParams.__controllers[1];
     const cellModel         = cellModelController.getValue();
@@ -209,17 +197,29 @@ export function manageDataFromGUI(gui: GUI, simScale:string="Cellular"): cellObj
 export function blockGraphsGuiParams(guiCellVarGraph: GUI, guiPECGGraph: GUI){
 
     // Disable things
-    // Disable varName
-    var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = guiCellVarGraph.__folders.Visualization.__controllers[3].domElement.querySelector('input');
-    if (controllerDomElement != null){
-        controllerDomElement.disabled = true;
+    // Disable varName and numPoints
+
+    var controllers = guiCellVarGraph.__folders.Visualization.__controllers;
+    for (let i=0; i<controllers.length; i++){
+        if ((controllers[i].property=='var_name') || (controllers[i].property=='num_points')){
+            var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = controllers[i].domElement.querySelector('input');
+            if (controllerDomElement != null){
+                controllerDomElement.disabled = true;
+            }
+        }
     }
-    // disable num_points
-    var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = guiCellVarGraph.__folders.Visualization.__controllers[4].domElement.querySelector('input');
-    if (controllerDomElement != null){
-        controllerDomElement.disabled = true;
+
+    var controllers = guiPECGGraph.__folders.Visualization.__controllers;
+    for (let i=0; i<controllers.length; i++){
+        if ((controllers[i].property=='var_name') || (controllers[i].property=='num_points')){
+            var controllerDomElement: HTMLInputElement | HTMLSelectElement |  null = controllers[i].domElement.querySelector('input');
+            if (controllerDomElement != null){
+                controllerDomElement.disabled = true;
+            }
+        }
     }
     
+
 
 
 }

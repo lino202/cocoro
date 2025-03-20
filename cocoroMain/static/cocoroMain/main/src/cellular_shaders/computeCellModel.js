@@ -1,8 +1,7 @@
-import { commonStructs, commonCellModelDefinitions } from './common.js';
 import { fentonKarmaDefinitions, fentonKarmaCoreCompute } from './fenton_karma_wgsl.js'
 import { gaurDefinitions, gaurCoreCompute} from './gaur_wgsl.js'
 
-export function computeCellModel(cellModel, workgroup_size, saveStart, debugStart, debugStateName, varName) {
+export function computeCellModel(cellModel, saveStart, debugStart, debugStateName, bindingNumber) {
 
     var specificDefinitions;
     var specificComputeCore;
@@ -20,47 +19,60 @@ export function computeCellModel(cellModel, workgroup_size, saveStart, debugStar
     var saveBufferDefinition = ``;
     var saveBufferAction = ``;
     if (saveStart >= 0){
-        saveBufferDefinition = `@binding(7) @group(0) var<storage, read_write> save_value : f32;`;
+        saveBufferDefinition = `@binding(${bindingNumber}) @group(0) var<storage, read_write> save_value : f32;`;
         saveBufferAction = `save_value = states.vm;`;
     }
     var debugBufferDefinition = ``;
     var debugBufferAction = ``;
     if (debugStart >= 0){
         if (saveStart >= 0){
-            debugBufferDefinition = `@binding(8) @group(0) var<storage, read_write> debug_value : f32;`;
+            debugBufferDefinition = `@binding(${bindingNumber+1}) @group(0) var<storage, read_write> debug_value : f32;`;
         }else{
-            debugBufferDefinition = `@binding(7) @group(0) var<storage, read_write> debug_value : f32;`;
+            debugBufferDefinition = `@binding(${bindingNumber}) @group(0) var<storage, read_write> debug_value : f32;`;
         }
-        debugBufferAction = `debug_value = states.` + debugStateName + `;`;
+        debugBufferAction = `debug_value = states.${debugStateName};`;
     }
 
     return /*wgsl*/`
-        ${commonStructs}
+
+        struct Stim {
+            period : f32,
+            amp: f32,
+            dur: f32,
+            start: f32
+        }
+
+        struct Integration {
+            dt : f32,
+        }
+
+        struct VisualParams {
+            plot_dt : f32,
+        }
 
         ${specificDefinitions}
-
-        ${commonCellModelDefinitions}
-
+  
+        @binding(0) @group(0) var<storage, read_write> states : States;
+        @binding(1) @group(0) var<uniform>             constants : Constants;
+        @binding(2) @group(0) var<storage, read>       stim : Stim;
+        @binding(3) @group(0) var<uniform>             integ : Integration;
+        @binding(4) @group(0) var<uniform>             visual_params : VisualParams;
         ${saveBufferDefinition}
         ${debugBufferDefinition}
+  
+        var<private> current_compute_interval: f32;
 
-        @compute @workgroup_size(${workgroup_size})
+        @compute @workgroup_size(1)
         fn comp_main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
             
             //Check for overcomputing and simulation stop
             let idx = GlobalInvocationID.x; 
-            if((idx >= arrayLength(&vois)) | (integ.dt <= 0.)) {return;}
-
-            // Vois not in the right tip of the line should just switch the value
-            if (idx <= (arrayLength(&vois)-2)) {
-                vois[idx] = vois_copy[idx+1];
-                return;    
-            }
+            if((idx != 0) | (integ.dt <= 0.)) {return;}
             
             // But for the last voi in the right tip of the line we compute the Vm
             current_compute_interval = trunc(states.t/visual_params.plot_dt);
 
-            // Compute to complete the plotting resolution dt_plot
+            // Compute
             loop { 
             
                 // Get the stimulation
@@ -77,16 +89,9 @@ export function computeCellModel(cellModel, workgroup_size, saveStart, debugStar
                 if ( trunc(states.t/visual_params.plot_dt) != current_compute_interval) {break;}
             }
 
-            // Pass to vois and normalize to plot
-            vois[idx] = states.${varName};
             ${saveBufferAction}
             ${debugBufferAction}
 
-            if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
-                vois[idx] = ((vois[idx] - visual_params.min) / (visual_params.max - visual_params.min)) * 2 - 1;
-            }else{
-                vois[idx] = 1.0; //Plot a line in the top if this overflows
-            }
         }
 
     `;

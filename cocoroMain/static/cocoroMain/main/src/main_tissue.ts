@@ -1,13 +1,11 @@
-import { SimLineMonodomain } from './main_modules/simLineMonodomain';
-import { SimQuadMonodomain} from './main_modules/simQuadMonodomain';
-import { SimHexaMonodomain} from './main_modules/simHexaMonodomain';
-import { checkWebGPU, meshObj, electrodesObj } from './helpers/helper';
-import { LightInputsInterface } from './helpers/mysettings';
-import { initGUI4UniqueCellModel, manageDataFromGUI, cellObj, blockGraphsGuiParams} from './helpers/manageCellModelGUI';
+import { checkWebGPU} from './helpers/helper';
+import { LightInputsInterface, MeshObj, ElectrodesObj, CellObj } from './helpers/interfaces';
+import { initGUI4UniqueCellModel, manageDataFromGUI, blockGraphsGuiParams} from './helpers/manageCellModelGUI';
 import $ from 'jquery';
 import { GUI } from 'dat.gui';
 import { Parser } from 'pickleparser';
 import EnsightWriter from './io/ensightWriter';
+import TissueSim from './main_modules/TissueSim';
 
 //  Global Variables ------------
 let li:LightInputsInterface = {};
@@ -16,7 +14,6 @@ const visualParams = {
     min   : -100,
     max   : 60,
     plot_dt  : 0.2,     // This should be in ms if dt is in ms
-    // num_points : 3000
 }
 
 const gpuSettings = {
@@ -49,15 +46,15 @@ const cellVarVisualizationFolder = guiCellVarGraph.addFolder('Visualization');
 const paramsCellVar = {
     min: -100,
     max: 60,
-    node_idx: 0,
     var_name: 'vm',
-    num_points: 2000
+    num_points: 2000,
+    node_idx: 0,
 };
 cellVarVisualizationFolder.add(paramsCellVar, 'min');
 cellVarVisualizationFolder.add(paramsCellVar, 'max');
-cellVarVisualizationFolder.add(paramsCellVar, 'node_idx');
 cellVarVisualizationFolder.add(paramsCellVar, 'var_name');
 cellVarVisualizationFolder.add(paramsCellVar, 'num_points');
+cellVarVisualizationFolder.add(paramsCellVar, 'node_idx');
 cellVarVisualizationFolder.close();
 
 // pECG
@@ -97,7 +94,7 @@ async function getMeshData() {
     const data = await response.blob();
     const arrayBuffer = await data.arrayBuffer();
     const byteArray = new Uint8Array(arrayBuffer);
-    var meshData:meshObj = parser.parse(byteArray);
+    var meshData:MeshObj = parser.parse(byteArray);
 
     meshData.vertexs                   = new Float32Array(meshData.vertexs)
     meshData.actual_points             = new Float32Array(meshData.actual_points)
@@ -131,7 +128,7 @@ async function getElectrodesData() {
     const data = await response.blob();
     const arrayBuffer = await data.arrayBuffer();
     const byteArray = new Uint8Array(arrayBuffer);
-    var electrodesData:electrodesObj = parser.parse(byteArray);
+    var electrodesData:ElectrodesObj = parser.parse(byteArray);
 
     // TODO what happens if there is no option 
     electrodesData.actual_points = new Float32Array(electrodesData.actual_points)
@@ -205,31 +202,24 @@ $('#btn-simulate').on('click', async ()=>{
     // This is done here because we need the user permission (gesture) for writting in the user's filesystem from the browser!
     // and when huge amount of data is being parsed and passed to the sim**Monodomain functions, the window mightbe be unresponsive
     //  leading to the user not being able to select the folder => the this.folderHandler is not defined => error  
-    var saveStart = gui.__folders.Save.__controllers[0].getValue();
-    var saveName = gui.__folders.Save.__controllers[2].getValue();
+    
+    
+    
+    var saveStart = gui.__folders.Save.__controllers.find(c => c.property === "start")?.getValue();
+    var saveName = gui.__folders.Save.__controllers.find(c => c.property === "save_name")?.getValue();
     let ensightWriter:EnsightWriter | undefined;
     if (saveStart >= 0){
         ensightWriter = await EnsightWriter.create(saveName + '_geometry.geo', saveName + '_animation.case', saveName + '_state');
     }
 
-    const meshData:meshObj             = await getMeshData();
-    const electrodesData:electrodesObj = await getElectrodesData();
-    const cellObj:cellObj              = await manageDataFromGUI(gui, "Tissue");
+    const meshData:MeshObj             = await getMeshData();
+    const electrodesData:ElectrodesObj = await getElectrodesData();
+    const cellObj:CellObj              = await manageDataFromGUI(gui);
     blockGraphsGuiParams(guiCellVarGraph, guiPECGGraph);
 
     // TODO? This might be something like in for the fraphs without the canvas for setting mouse stim params before launching the simulation
-    const isMouseStimChecked = (document.getElementById('mouse_stim_checkbox') as HTMLInputElement).checked;
+    const mouseStimActive = (document.getElementById('mouse_stim_checkbox') as HTMLInputElement).checked;
 
-    if (meshData.elementType == "line") {
-        console.log("Line Monodomain Simulation")
-        SimLineMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph, isMouseStimChecked);
-    }else if (meshData.elementType == "quad"){
-        console.log("Quad Monodomain Simulation")
-        SimQuadMonodomain(gui, meshData, electrodesData, cellObj, ensightWriter, guiCellVarGraph, guiPECGGraph, isMouseStimChecked);
-    }else if (meshData.elementType == "hexa") {
-        console.log("Hexa Monodomain Simulation")
-        SimHexaMonodomain(gui, meshData, electrodesData, cellObj, li, ensightWriter, guiCellVarGraph, guiPECGGraph, isMouseStimChecked);
-    }else{
-        console.log("Wrong elementType, you need to provide a mesh with line, quad or hexa elements")
-    }
+    const simulator:TissueSim = await TissueSim.create(meshData, gui, cellObj, ensightWriter, electrodesData, guiCellVarGraph, guiPECGGraph, mouseStimActive);
+    requestAnimationFrame(simulator.simulate);
 });

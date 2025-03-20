@@ -1,11 +1,11 @@
 import {mat4, vec3, vec4} from 'gl-matrix';
-import { meshObj } from '../helpers/helper';
+import { MeshObj } from '../helpers/interfaces';
 import {mouseStimHandlerComputeShader1, reductionComputeShader, mouseStimHandlerComputeShader2} from './mouseStimShaders'
 import { GUI } from 'dat.gui';
 
 class MouseStimHandler {
     device: GPUDevice;
-    meshData: meshObj;
+    meshData: MeshObj;
     isDragging: boolean;
     canvas: HTMLCanvasElement;
     vpMatrix: mat4;
@@ -43,7 +43,7 @@ class MouseStimHandler {
     perElemNearestCoordsBuffer: GPUBuffer;
 
 
-    constructor(device: GPUDevice, meshData:meshObj, canvas: HTMLCanvasElement, adapterLimits:GPUSupportedLimits) {
+    constructor(device: GPUDevice, meshData:MeshObj, canvas: HTMLCanvasElement, adapterLimits:GPUSupportedLimits) {
         this.isDragging = false;
         this.canvas = canvas;
         this.vpMatrix     = mat4.create(); 

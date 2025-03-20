@@ -1,36 +1,34 @@
 import { renderPECGGraphFragmentShader, renderPECGGraphVertexShader } from './PECGGraphShaders';
 import { computePECGGraphShader1, computePECGGraphShader2, computePECGGraphShader3, computePECGGraphShader4 } from './PECGGraphShaders';
-import { createGPUBuffer, createGPUBufferUint} from '../helpers/helper';
 import { GUI } from 'dat.gui';
-import { cellObj } from '../helpers/manageCellModelGUI';
-import { meshObj, electrodesObj } from '../helpers/helper';
+import { MeshObj, ElectrodesObj, CellObj } from '../helpers/interfaces';
 
 class PECGGraph {
 
-    device: GPUDevice;
-    canvas: HTMLCanvasElement;
-    textureFormat: GPUTextureFormat;
-    gui: GUI;
-    numPoints: number;
-    min: number;
-    max: number;
-    context: GPUCanvasContext;
-    renderPipeline: GPURenderPipeline;
-    computePipeline2: GPUComputePipeline;
-    computePipeline3: GPUComputePipeline;
-    computePipeline4: GPUComputePipeline;
-    renderPassDescriptor: GPURenderPassDescriptor;
+    device                      : GPUDevice;
+    canvas                      : HTMLCanvasElement;
+    textureFormat               : GPUTextureFormat;
+    gui                         : GUI;
+    numPoints                   : number;
+    min                         : number;
+    max                         : number;
+    context                     : GPUCanvasContext;
+    renderPipeline              : GPURenderPipeline;
+    computePipeline2            : GPUComputePipeline;
+    computePipeline3            : GPUComputePipeline;
+    computePipeline4            : GPUComputePipeline;
+    renderPassDescriptor        : GPURenderPassDescriptor;
     numberOfIndexes             : number;
     coordsBuffer                : GPUBuffer;
     indexBuffer                 : GPUBuffer;
     voiBuffer                   : GPUBuffer;
     voiBufferCopy               : GPUBuffer; //avoids data race on shader invocations
-    meshData                    : meshObj;
-    electrodesData              : electrodesObj;
+    meshData                    : MeshObj;
+    electrodesData              : ElectrodesObj;
     nNodes                      : number;
     workgroupSize               : number;
     maxWorkgroupSize            : number;
-    cellObj                     : cellObj;
+    cellObj                     : CellObj;
     numPotentials               : number;
     numECGLeads                 : number;
     gradInvRBuffer              : GPUBuffer;
@@ -39,21 +37,19 @@ class PECGGraph {
     visualParamsBuffer          : GPUBuffer;
     smoothingBuffer             : GPUBuffer;
     potentialPerWorkgroupBuffer : GPUBuffer;
-    statesBuffer: GPUBuffer | null = null;
-    computeBindGroup2: GPUBindGroup | null = null;
-    computeBindGroup3: GPUBindGroup;
-    computeBindGroup4: GPUBindGroup;
+    statesBuffer                : GPUBuffer | null = null;
+    computeBindGroup2           : GPUBindGroup | null = null;
+    computeBindGroup3           : GPUBindGroup;
+    computeBindGroup4           : GPUBindGroup;
     nWorkgroupsComputeShader2   : number;
+    alphaSmoothing              : number;
 
-    constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:cellObj,
-                meshData:meshObj, electrodesData:electrodesObj, nNodes:number, adapterLimits:GPUSupportedLimits, gui:GUI, workgroupSize:number=64) {
+    constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:CellObj,
+                meshData:MeshObj, electrodesData:ElectrodesObj, nNodes:number, adapterLimits:GPUSupportedLimits, gui:GUI, workgroupSize:number=64) {
         this.device = device;
         this.textureFormat = textureFormat;
         this.canvas = canvas;
         this.gui = gui;
-        this.min = gui.__folders.Visualization.__controllers[0].getValue();
-        this.max = gui.__folders.Visualization.__controllers[1].getValue();
-        this.numPoints = gui.__folders.Visualization.__controllers[2].getValue();
         this.meshData = meshData;
         this.electrodesData = electrodesData;
         this.nNodes    = nNodes;
@@ -62,6 +58,27 @@ class PECGGraph {
         this.cellObj = cellObj;
         this.numPotentials = 10;
         this.numECGLeads   = 12;
+
+        // Init gui based attributes
+        const minController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "min")
+        if (minController === undefined){ throw Error(`GUI controller min not found!`)}
+        this.min = minController.getValue();
+        minController.onChange((value) => {this.min = value;});
+
+        const maxController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "max")
+        if (maxController === undefined){ throw Error(`GUI controller max not found!`)}
+        this.max = maxController.getValue();
+        maxController.onChange((value) => {this.max = value;});
+        
+        const numPointsController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "num_points")
+        if (numPointsController === undefined){ throw Error(`GUI controller num_points not found!`)}
+        this.numPoints = numPointsController.getValue();
+        // numPointsController.onChange((value) => {this.numPoints = value;}); not necessary this does not change once the computing is up
+
+        const alphaSmoothingController = this.gui.__folders.Visualization.__controllers.find(c => c.property === "alpha_smoothing")
+        if (alphaSmoothingController === undefined){ throw Error(`GUI controller alpha_smoothing not found!`)}
+        this.alphaSmoothing = alphaSmoothingController.getValue();
+        alphaSmoothingController.onChange((value) => {this.alphaSmoothing = value;});
 
         if (this.electrodesData.actual_points.length == 0){
             throw new Error(`The electrodes positions are null for this mesh`)
@@ -222,9 +239,28 @@ class PECGGraph {
         const coords          = this.getXYCoords();
         const voiInitValues   = new Float32Array(this.numPoints * this.numECGLeads).fill(0);
         this.numberOfIndexes  = indexs.length;
-        this.coordsBuffer     = createGPUBuffer(this.device, coords);
-        this.indexBuffer      = createGPUBufferUint(this.device, indexs);
-        this.voiBuffer        = createGPUBuffer(this.device, voiInitValues, GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+
+        this.coordsBuffer = this.device.createBuffer({
+            label: "PECGGraph_coordsBuffer",
+            size: coords.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.coordsBuffer, 0, coords);
+        
+        this.voiBuffer = this.device.createBuffer({
+            label: "PECGGraph_voiBuffer",
+            size: voiInitValues.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
+        }) as GPUBuffer;
+        this.device.queue.writeBuffer(this.voiBuffer, 0, voiInitValues);
+
+        this.indexBuffer = this.device.createBuffer({
+            label: 'PECGGraph_indexBuffer',
+            size: indexs.byteLength,
+            usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+        });
+        this.device.queue.writeBuffer(this.indexBuffer, 0, indexs);
+
         this.voiBufferCopy = this.device.createBuffer({
             label: "PECGGraph_voiBufferCopy",
             size: Float32Array.BYTES_PER_ELEMENT * voiInitValues.length,
@@ -599,15 +635,15 @@ class PECGGraph {
             this.visualParamsBuffer,
             0,
             new Float32Array([
-                this.gui.__folders.Visualization.__controllers[0].getValue(),   
-                this.gui.__folders.Visualization.__controllers[1].getValue()
+                this.min,   
+                this.max
             ])
         );
 
         this.device.queue.writeBuffer(
             this.smoothingBuffer,
             0,
-            new Float32Array([this.gui.__folders.Visualization.__controllers[3].getValue()])
+            new Float32Array([this.alphaSmoothing])
         );
 
         {   //Compute Update

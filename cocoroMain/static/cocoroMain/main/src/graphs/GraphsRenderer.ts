@@ -1,29 +1,27 @@
 
-import { extraCanvases } from '../helpers/helper';
-import CellVarGraph from './CellVarGraph';
+import { ExtraCanvases, CellObj, MeshObj, ElectrodesObj } from '../helpers/interfaces';
+import CellVarGraphTissue from './CellVarGraphTissue';
 import PECGGraph from './PECGGraph';
 import { GUI } from 'dat.gui';
-import { cellObj } from '../helpers/manageCellModelGUI';
-import { meshObj, electrodesObj } from '../helpers/helper';
 
 class GraphsRenderer {
     // This class is used to manage the renders for graphs
 
-    device: GPUDevice;
-    textureFormat: GPUTextureFormat;
-    canvases: extraCanvases;
-    isActivated: boolean = false;
-    cellObj: cellObj;
-    nNodes: number;
-    guiCellVarGraph: GUI;
-    guiPECGGraph: GUI;
+    device          : GPUDevice;
+    textureFormat   : GPUTextureFormat;
+    canvases        : ExtraCanvases;
+    isActivated     : boolean = false;
+    cellObj         : CellObj;
+    nNodes          : number;
+    guiCellVarGraph : GUI;
+    guiPECGGraph    : GUI;
 
     // For now we only allow two canvases at the same time, one cellVar and the other pECG
-    cellVarGraph: CellVarGraph|undefined = undefined;
-    pECGGraph: PECGGraph|undefined = undefined; 
+    cellVarGraph: CellVarGraphTissue|undefined = undefined;
+    pECGGraph   : PECGGraph|undefined = undefined; 
 
-    constructor(device:GPUDevice, textureFormat:GPUTextureFormat, canvases:extraCanvases, 
-                cellObj:cellObj, meshData:meshObj, electrodesData:electrodesObj, adapterLimits:GPUSupportedLimits, guiCellVarGraph:GUI, guiPECGGraph:GUI) {
+    constructor(device:GPUDevice, textureFormat:GPUTextureFormat, canvases:ExtraCanvases, adapterLimits:GPUSupportedLimits,
+                cellObj:CellObj, meshData:MeshObj, electrodesData:ElectrodesObj, guiCellVarGraph:GUI, guiPECGGraph:GUI) {
         this.device = device;
         this.textureFormat = textureFormat;
         this.canvases = canvases;
@@ -38,7 +36,7 @@ class GraphsRenderer {
 
         // Init graphs
         if (this.canvases.cellVar != undefined){
-            this.cellVarGraph = new CellVarGraph(this.device, this.canvases.cellVar, this.textureFormat, this.cellObj, this.nNodes, this.guiCellVarGraph);
+            this.cellVarGraph = new CellVarGraphTissue(this.device, this.canvases.cellVar, this.textureFormat, this.cellObj, this.nNodes, this.guiCellVarGraph);
         }
         if (this.canvases.pECG != undefined){
             this.pECGGraph = new PECGGraph(this.device, this.canvases.pECG, this.textureFormat, this.cellObj, meshData, electrodesData, this.nNodes, adapterLimits, this.guiPECGGraph)
