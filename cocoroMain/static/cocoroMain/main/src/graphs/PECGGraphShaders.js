@@ -163,7 +163,8 @@ function computeGradLine(specificDefinitions, nNodes, nWorkgroups, workgroup_siz
                      @builtin(local_invocation_id) LocalInvocationId: vec3<u32>,
                      @builtin(workgroup_id) WorkgroupID: vec3<u32>) {
             
-            //Elems over nNodes do not sum anything :D!
+            // The idx can be over nNodes -> these do not sum anything :D so it is ok!
+            // this maintains the 'uniform control flow' allowing the barrier to work
             let idx = GlobalInvocationID.x;
 
             // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
@@ -325,7 +326,8 @@ function computeGradQuad(specificDefinitions, nNodes, nWorkgroups, workgroup_siz
                      @builtin(local_invocation_id) LocalInvocationId: vec3<u32>,
                      @builtin(workgroup_id) WorkgroupID: vec3<u32>) {
             
-            //Elems over nNodes do not sum anything :D!
+            // The idx can be over nNodes -> these do not sum anything :D so it is ok!
+            // this maintains the 'uniform control flow' allowing the barrier to work
             let idx = GlobalInvocationID.x;
 
             // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
@@ -359,13 +361,14 @@ function computeGradQuad(specificDefinitions, nNodes, nWorkgroups, workgroup_siz
             // But the above condition do not take into account the 4 inner corners (the ddx and ddy are computed), so
             // we need to take care of those manually, this do not work on holes made up of 1 quad elem ATTENTION
             // TODO check if this should be zero as I believe it must be
-            if (((_i1_j1 == ${nNodes}) & (_i1_1j < ${nNodes}) & (_1i_1j < ${nNodes}) & (_1i_j1 < ${nNodes})) |
-                ((_i1_j1 < ${nNodes}) & (_i1_1j == ${nNodes}) & (_1i_1j < ${nNodes}) & (_1i_j1 < ${nNodes})) |
-                ((_i1_j1 < ${nNodes}) & (_i1_1j < ${nNodes}) & (_1i_1j == ${nNodes}) & (_1i_j1 < ${nNodes})) |
-                ((_i1_j1 < ${nNodes}) & (_i1_1j < ${nNodes}) & (_1i_1j < ${nNodes}) & (_1i_j1 == ${nNodes}))){
-                ddx_V = 0.0;
-                ddy_V = 0.0;
-            }
+            // I comment this part as I assume as correct to compute the gradients if the ghost nodes exists 
+            // if (((_i1_j1 == {nNodes}) & (_i1_1j < {nNodes}) & (_1i_1j < {nNodes}) & (_1i_j1 < {nNodes})) |
+            //     ((_i1_j1 < {nNodes}) & (_i1_1j == {nNodes}) & (_1i_1j < {nNodes}) & (_1i_j1 < {nNodes})) |
+            //     ((_i1_j1 < {nNodes}) & (_i1_1j < {nNodes}) & (_1i_1j == {nNodes}) & (_1i_j1 < {nNodes})) |
+            //     ((_i1_j1 < {nNodes}) & (_i1_1j < {nNodes}) & (_1i_1j < {nNodes}) & (_1i_j1 == {nNodes}))){
+            //     ddx_V = 0.0;
+            //     ddy_V = 0.0;
+            // }
             
             // sum to the same location for accumalation (integral), in line we only need dx 
             // TODO ATTENTION check if the minus sign is correct, moreover the conductivities and other constants outside the 
@@ -373,16 +376,16 @@ function computeGradQuad(specificDefinitions, nNodes, nWorkgroups, workgroup_siz
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
             
             // We populate the workgroup variable with shared memory/data to synchronously sum
-            workgroup_data[LocalInvocationId.x].la = ddx_V * grad_inv_r_arr[idx].la.x * amplification;
-            workgroup_data[LocalInvocationId.x].ra = ddx_V * grad_inv_r_arr[idx].ra.x * amplification;
-            workgroup_data[LocalInvocationId.x].ll = ddx_V * grad_inv_r_arr[idx].ll.x * amplification;
-            workgroup_data[LocalInvocationId.x].rl = ddx_V * grad_inv_r_arr[idx].rl.x * amplification;
-            workgroup_data[LocalInvocationId.x].v1 = ddx_V * grad_inv_r_arr[idx].v1.x * amplification;
-            workgroup_data[LocalInvocationId.x].v2 = ddx_V * grad_inv_r_arr[idx].v2.x * amplification;
-            workgroup_data[LocalInvocationId.x].v3 = ddx_V * grad_inv_r_arr[idx].v3.x * amplification;
-            workgroup_data[LocalInvocationId.x].v4 = ddx_V * grad_inv_r_arr[idx].v4.x * amplification;
-            workgroup_data[LocalInvocationId.x].v5 = ddx_V * grad_inv_r_arr[idx].v5.x * amplification;
-            workgroup_data[LocalInvocationId.x].v6 = ddx_V * grad_inv_r_arr[idx].v6.x * amplification;
+            workgroup_data[LocalInvocationId.x].la = (ddx_V * grad_inv_r_arr[idx].la.x + ddy_V * grad_inv_r_arr[idx].la.y) * amplification;
+            workgroup_data[LocalInvocationId.x].ra = (ddx_V * grad_inv_r_arr[idx].ra.x + ddy_V * grad_inv_r_arr[idx].ra.y) * amplification;
+            workgroup_data[LocalInvocationId.x].ll = (ddx_V * grad_inv_r_arr[idx].ll.x + ddy_V * grad_inv_r_arr[idx].ll.y) * amplification;
+            workgroup_data[LocalInvocationId.x].rl = (ddx_V * grad_inv_r_arr[idx].rl.x + ddy_V * grad_inv_r_arr[idx].rl.y) * amplification;
+            workgroup_data[LocalInvocationId.x].v1 = (ddx_V * grad_inv_r_arr[idx].v1.x + ddy_V * grad_inv_r_arr[idx].v1.y) * amplification;
+            workgroup_data[LocalInvocationId.x].v2 = (ddx_V * grad_inv_r_arr[idx].v2.x + ddy_V * grad_inv_r_arr[idx].v2.y) * amplification;
+            workgroup_data[LocalInvocationId.x].v3 = (ddx_V * grad_inv_r_arr[idx].v3.x + ddy_V * grad_inv_r_arr[idx].v3.y) * amplification;
+            workgroup_data[LocalInvocationId.x].v4 = (ddx_V * grad_inv_r_arr[idx].v4.x + ddy_V * grad_inv_r_arr[idx].v4.y) * amplification;
+            workgroup_data[LocalInvocationId.x].v5 = (ddx_V * grad_inv_r_arr[idx].v5.x + ddy_V * grad_inv_r_arr[idx].v5.y) * amplification;
+            workgroup_data[LocalInvocationId.x].v6 = (ddx_V * grad_inv_r_arr[idx].v6.x + ddy_V * grad_inv_r_arr[idx].v6.y) * amplification;
 
             // Wait to for all invocations in the same workgroup to have the values computed and loaded
             workgroupBarrier();
@@ -531,7 +534,8 @@ function computeGradHexa(specificDefinitions, nNodes, nWorkgroups, workgroup_siz
                      @builtin(local_invocation_id) LocalInvocationId: vec3<u32>,
                      @builtin(workgroup_id) WorkgroupID: vec3<u32>) {
             
-            //Elems over nNodes do not sum anything :D!
+            // The idx can be over nNodes -> these do not sum anything :D so it is ok!
+            // this maintains the 'uniform control flow' allowing the barrier to work
             let idx = GlobalInvocationID.x;
 
             // Compute the gradV . grad(r) where is the magnitude of the node position with respect to one electrode
@@ -595,46 +599,46 @@ function computeGradHexa(specificDefinitions, nNodes, nWorkgroups, workgroup_siz
             // TODO check if this should be zero as I believe it must be
             
             // For the inner cornes
-            if (((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k == ${nNodes}))){
-                ddx_V = 0.0;
-                ddy_V = 0.0;
-                ddz_V = 0.0;
-            }
+            // if (((_i1_j1_k1 == {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 == {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 == {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 == {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k == {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k == {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k == {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k == {nNodes}))){
+            //     ddx_V = 0.0;
+            //     ddy_V = 0.0;
+            //     ddz_V = 0.0;
+            // }
 
-            // For the inner lines, if we lack two corners out of 8 we are in a inner line
-            if (((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k == ${nNodes}))){
-                // ddx remain computed and the others are zeroed
-                ddy_V = 0.0;
-                ddz_V = 0.0;
-            }
+            // // For the inner lines, if we lack two corners out of 8 we are in a inner line
+            // if (((_i1_j1_k1 == {nNodes}) & (_1i_j1_k1 == {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 == {nNodes}) & (_1i_1j_k1 == {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k == {nNodes}) & (_1i_j1_1k == {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k == {nNodes}) & (_1i_1j_1k == {nNodes}))){
+            //     // ddx remain computed and the others are zeroed
+            //     ddy_V = 0.0;
+            //     ddz_V = 0.0;
+            // }
 
-            if (((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k == ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k < ${nNodes}))){
-                // ddy remain computed and the others are zeroed
-                ddx_V = 0.0;
-                ddz_V = 0.0;
-            }
+            // if (((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 == {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 == {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 == {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 == {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k == {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k == {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k == {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k == {nNodes}) & (_1i_1j_1k < {nNodes}))){
+            //     // ddy remain computed and the others are zeroed
+            //     ddx_V = 0.0;
+            //     ddz_V = 0.0;
+            // }
 
-            if (((_i1_j1_k1 == ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k == ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 == ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k == ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 == ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 < ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k == ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k < ${nNodes})) |
-                ((_i1_j1_k1 < ${nNodes}) & (_1i_j1_k1 < ${nNodes}) & (_i1_1j_k1 < ${nNodes}) & (_1i_1j_k1 == ${nNodes}) & (_i1_j1_1k < ${nNodes}) & (_1i_j1_1k < ${nNodes}) & (_i1_1j_1k < ${nNodes}) & (_1i_1j_1k == ${nNodes}))){
-                // ddz remain computed and the others are zeroed
-                ddx_V = 0.0;
-                ddy_V = 0.0;
-            }
+            // if (((_i1_j1_k1 == {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k == {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 == {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k == {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 == {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 < {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k == {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k < {nNodes})) |
+            //     ((_i1_j1_k1 < {nNodes}) & (_1i_j1_k1 < {nNodes}) & (_i1_1j_k1 < {nNodes}) & (_1i_1j_k1 == {nNodes}) & (_i1_j1_1k < {nNodes}) & (_1i_j1_1k < {nNodes}) & (_i1_1j_1k < {nNodes}) & (_1i_1j_1k == {nNodes}))){
+            //     // ddz remain computed and the others are zeroed
+            //     ddx_V = 0.0;
+            //     ddy_V = 0.0;
+            // }
 
             
             // sum to the same location for accumalation (integral), in line we only need dx 
@@ -643,16 +647,16 @@ function computeGradHexa(specificDefinitions, nNodes, nWorkgroups, workgroup_siz
             // the extracellular potential for plotting, so trends are ok but remember! magnitudes are not in mV
 
             // We populate the workgroup variable with shared memory/data to synchronously sum
-            workgroup_data[LocalInvocationId.x].la = ddx_V * grad_inv_r_arr[idx].la.x * amplification;
-            workgroup_data[LocalInvocationId.x].ra = ddx_V * grad_inv_r_arr[idx].ra.x * amplification;
-            workgroup_data[LocalInvocationId.x].ll = ddx_V * grad_inv_r_arr[idx].ll.x * amplification;
-            workgroup_data[LocalInvocationId.x].rl = ddx_V * grad_inv_r_arr[idx].rl.x * amplification;
-            workgroup_data[LocalInvocationId.x].v1 = ddx_V * grad_inv_r_arr[idx].v1.x * amplification;
-            workgroup_data[LocalInvocationId.x].v2 = ddx_V * grad_inv_r_arr[idx].v2.x * amplification;
-            workgroup_data[LocalInvocationId.x].v3 = ddx_V * grad_inv_r_arr[idx].v3.x * amplification;
-            workgroup_data[LocalInvocationId.x].v4 = ddx_V * grad_inv_r_arr[idx].v4.x * amplification;
-            workgroup_data[LocalInvocationId.x].v5 = ddx_V * grad_inv_r_arr[idx].v5.x * amplification;
-            workgroup_data[LocalInvocationId.x].v6 = ddx_V * grad_inv_r_arr[idx].v6.x * amplification;
+            workgroup_data[LocalInvocationId.x].la = (ddx_V * grad_inv_r_arr[idx].la.x + ddy_V * grad_inv_r_arr[idx].la.y + ddz_V * grad_inv_r_arr[idx].la.z) * amplification;
+            workgroup_data[LocalInvocationId.x].ra = (ddx_V * grad_inv_r_arr[idx].ra.x + ddy_V * grad_inv_r_arr[idx].ra.y + ddz_V * grad_inv_r_arr[idx].ra.z) * amplification;
+            workgroup_data[LocalInvocationId.x].ll = (ddx_V * grad_inv_r_arr[idx].ll.x + ddy_V * grad_inv_r_arr[idx].ll.y + ddz_V * grad_inv_r_arr[idx].ll.z) * amplification;
+            workgroup_data[LocalInvocationId.x].rl = (ddx_V * grad_inv_r_arr[idx].rl.x + ddy_V * grad_inv_r_arr[idx].rl.y + ddz_V * grad_inv_r_arr[idx].rl.z) * amplification;
+            workgroup_data[LocalInvocationId.x].v1 = (ddx_V * grad_inv_r_arr[idx].v1.x + ddy_V * grad_inv_r_arr[idx].v1.y + ddz_V * grad_inv_r_arr[idx].v1.z) * amplification;
+            workgroup_data[LocalInvocationId.x].v2 = (ddx_V * grad_inv_r_arr[idx].v2.x + ddy_V * grad_inv_r_arr[idx].v2.y + ddz_V * grad_inv_r_arr[idx].v2.z) * amplification;
+            workgroup_data[LocalInvocationId.x].v3 = (ddx_V * grad_inv_r_arr[idx].v3.x + ddy_V * grad_inv_r_arr[idx].v3.y + ddz_V * grad_inv_r_arr[idx].v3.z) * amplification;
+            workgroup_data[LocalInvocationId.x].v4 = (ddx_V * grad_inv_r_arr[idx].v4.x + ddy_V * grad_inv_r_arr[idx].v4.y + ddz_V * grad_inv_r_arr[idx].v4.z) * amplification;
+            workgroup_data[LocalInvocationId.x].v5 = (ddx_V * grad_inv_r_arr[idx].v5.x + ddy_V * grad_inv_r_arr[idx].v5.y + ddz_V * grad_inv_r_arr[idx].v5.z) * amplification;
+            workgroup_data[LocalInvocationId.x].v6 = (ddx_V * grad_inv_r_arr[idx].v6.x + ddy_V * grad_inv_r_arr[idx].v6.y + ddz_V * grad_inv_r_arr[idx].v6.z) * amplification;
 
             // Wait to for all invocations in the same workgroup to have the values computed and loaded
             workgroupBarrier();
