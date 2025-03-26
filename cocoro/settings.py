@@ -125,3 +125,6 @@ STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
 
 MEDIA_ROOT = os.path.join(tempfile.gettempdir(), 'cocoro/')
+
+if not os.path.exists(MEDIA_ROOT):
+    os.mkdir(MEDIA_ROOT)
