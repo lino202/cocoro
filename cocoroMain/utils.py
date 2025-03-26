@@ -248,15 +248,15 @@ def parseMesh(binaryData):
     else:
         renderMesh = mesh
         
-    # Get vertexs and dx
+    # Get dx
+    cellPoints = numpy_support.vtk_to_numpy(mesh.GetCell(0).GetPoints().GetData())
+    diff       = cellPoints - cellPoints[0,:]
+    dists      = np.linalg.norm(diff, axis=1)
+    dx         = dists[np.argsort(dists)[1]]
+
+    # Get vertexs, Normalize vertexs to -1 to 1
     vertexs = numpy_support.vtk_to_numpy(renderMesh.GetPoints().GetData())
 
-    # For getting dx we pass all to int as we are in um and the minimum difference dx should be
-    # not less than 50 um (cell size), in this way we avoid precision error of floats
-    # Vertexs should be in um !!
-    dx = np.max(np.abs(np.round(vertexs[0,:]).astype(int) - np.round(vertexs[1,:]).astype(int)))
-
-    # Normalize vertexs to -1 to 1
     norm_dx = ((dx - vertexs.min()) / (vertexs.max() - vertexs.min())) * 2   # no need to substract 1
     vertexs = (vertexs - vertexs.min()) / (vertexs.max() - vertexs.min())
     vertexs = (vertexs * 2) - 1
