@@ -13,7 +13,7 @@ let li:LightInputsInterface = {};
 const visualParams = {
     min   : -100,
     max   : 60,
-    plot_dt  : 0.2,     // This should be in ms if dt is in ms
+    plot_dt  : 1,     // This should be in ms if dt is in ms
 }
 
 const gpuSettings = {
@@ -66,8 +66,8 @@ guiPECGGraphContainer.appendChild(guiPECGGraph.domElement);
 
 const pECGVisualizationFolder = guiPECGGraph.addFolder('Visualization');
 const paramsPECG = {
-    min: -1,
-    max: 1,
+    min: -40,
+    max: 40,
     num_points: 2000,
     alpha_smoothing: 0.6
 };
@@ -220,6 +220,12 @@ $('#btn-simulate').on('click', async ()=>{
     // TODO? This might be something like in for the fraphs without the canvas for setting mouse stim params before launching the simulation
     const mouseStimActive = (document.getElementById('mouse_stim_checkbox') as HTMLInputElement).checked;
 
+    // Create the simulator
     const simulator:TissueSim = await TissueSim.create(meshData, gui, cellObj, ensightWriter, electrodesData, guiCellVarGraph, guiPECGGraph, mouseStimActive);
+
+    // Init the execution time counter
+    simulator.executionTimeStart = performance.now();
+
+    // Simulate
     requestAnimationFrame(simulator.simulate);
 });

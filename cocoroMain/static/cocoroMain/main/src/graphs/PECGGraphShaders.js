@@ -956,18 +956,19 @@ export function computePECGGraphShader4(numPoints, workgroup_size=64){
                 max_value_to_plot = 0.0;
                 min_value_to_plot = -1.0;
             }
-
-            // Smoothing
-            // this is more responsive as I can update alpha and is simpler to compute and fast, the user can instantanialy decide if smooth or not
-            // and also the magnitude
-            // is a good first smoothing method rather than using more sophisticated ones that can not be updated on the fly
-            // block alpha to be 0 and 1 if it  zero the calculation is blocked! -> total smoothness if 1 is not smoothed at all
-            vois[idx] = alpha_smoothing * vois[idx] + (1.0 - alpha_smoothing) * vois_copy[idx-1];
         
             // Pass to vois and normalize to plot
             if (vois[idx] < 3.40282346638528859812e+38f){ //Check for overflow, nan or inf positive oder negative
                 //range needs to be [-0.5,0.5] as after the vertex_shader sums +/-0.5
                 vois[idx] = ((vois[idx] - visualization.min) / (visualization.max - visualization.min)) - 0.5; 
+
+                // Smoothing
+                // this is more responsive as I can update alpha and is simpler to compute and fast, the user can instantanialy decide if smooth or not
+                // and also the magnitude
+                // is a good first smoothing method rather than using more sophisticated ones that can not be updated on the fly
+                // block alpha to be 0 and 1 if it  zero the calculation is blocked! -> total smoothness if 1 is not smoothed at all
+                vois[idx] = alpha_smoothing * vois[idx] + (1.0 - alpha_smoothing) * vois_copy[idx-1];
+
                 if (vois[idx] > max_value_to_plot){
                     vois[idx] = max_value_to_plot;
                 }

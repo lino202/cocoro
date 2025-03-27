@@ -14,7 +14,7 @@ const visualParams = {
     max   : 60,
     var_name: 'vm',
     num_points : 10000,
-    plot_dt  : 0.2,     // This should be in ms if dt is in ms and in last position
+    plot_dt  : 1,     // This should be in ms if dt is in ms and in last position
 }
 const gpuSettings = {
     workgroup_size   : 64,

@@ -43,9 +43,11 @@ class PECGGraph {
     computeBindGroup4           : GPUBindGroup;
     nWorkgroupsComputeShader2   : number;
     alphaSmoothing              : number;
+    readSaveBuffer!              : GPUBuffer;
 
     constructor(device: GPUDevice, canvas: HTMLCanvasElement, textureFormat: GPUTextureFormat, cellObj:CellObj,
-                meshData:MeshObj, electrodesData:ElectrodesObj, nNodes:number, adapterLimits:GPUSupportedLimits, gui:GUI, workgroupSize:number=64) {
+                meshData:MeshObj, electrodesData:ElectrodesObj, nNodes:number, adapterLimits:GPUSupportedLimits, 
+                gui:GUI, save: boolean, workgroupSize:number=64) {
         this.device = device;
         this.textureFormat = textureFormat;
         this.canvas = canvas;
@@ -629,7 +631,54 @@ class PECGGraph {
         
     }
 
-    render(commandEncoder: GPUCommandEncoder){
+
+    async saveToCSV(folderHandler: any,currentSimTime: number, plot_dt: number){
+
+        // check if folderHandler is defined
+        if (folderHandler == null) {
+            throw new Error('Folder handler not defined');
+        }
+
+        // Open output animation file. This is a binary file
+        const fileHandler = await folderHandler.getFileHandle("pECG.csv", { create: true });
+            
+        // Create a writable stream
+        const writable = await fileHandler.createWritable();
+
+        // Get the time start
+        const startTime = currentSimTime - this.numPoints * plot_dt;
+
+        // Get the data from the gpu
+        await this.readSaveBuffer.mapAsync(GPUMapMode.READ);
+        const arrayBuffer = this.readSaveBuffer.getMappedRange();
+        const pECGs       = new Float32Array(arrayBuffer);
+
+        // Create CSV content with headers
+        let csvContent = "Time_ms,I,II,III,aVR,aVL,aVF,V1,V2,V3,V4,V5,V6\n";
+
+        // Add each row
+        for (let i = 0; i < this.numPoints; i++) {
+            csvContent += `${startTime + i * plot_dt},`;
+
+            for (let j = 0; j < this.numECGLeads; j++){
+
+                var pecgValue = (pECGs[j * this.numPoints + i] + 0.5) * (this.max - this.min) + this.min;
+
+                if (j < this.numECGLeads-1){
+                    csvContent += `${pecgValue},`;
+                }else{
+                    csvContent += `${pecgValue}\n`;
+                }
+                
+            }
+        }
+
+        // Save and close file
+        await writable.write(csvContent);
+        await writable.close();
+    }
+
+    render(commandEncoder: GPUCommandEncoder, save: boolean){
         
         this.device.queue.writeBuffer(
             this.visualParamsBuffer,
@@ -680,6 +729,15 @@ class PECGGraph {
             passEncoder.end();
         }
         commandEncoder.copyBufferToBuffer(this.voiBuffer, 0, this.voiBufferCopy, 0, this.numPoints * this.numECGLeads * Float32Array.BYTES_PER_ELEMENT);
+
+        if (save){
+            this.readSaveBuffer = this.device.createBuffer({
+                label: "PECGGraph_readSaveBuffer",
+                size: Float32Array.BYTES_PER_ELEMENT * this.numPoints * this.numECGLeads,
+                usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+            }) as GPUBuffer;
+            commandEncoder.copyBufferToBuffer(this.voiBuffer, 0, this.readSaveBuffer, 0, this.numPoints * this.numECGLeads * Float32Array.BYTES_PER_ELEMENT);
+        }
     }
 
 }

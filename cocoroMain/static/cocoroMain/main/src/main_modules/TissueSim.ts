@@ -26,6 +26,9 @@ class TissueSim extends Simulation {
     ensightWriter  : EnsightWriter|undefined;
     min            : number;
     max            : number;
+    executionTimeStart: number = 0;
+    executionTimeStop:  number = 0;
+    executionTimeMeasuredInterval: number = 500; // in ms
 
     // TODO The ideal would be that the ! is not needed but we need to wait until we have a gpu device
     // otherwise all code fordward would end in a error, as all values obtained in initGPU are undefined!
@@ -132,7 +135,7 @@ class TissueSim extends Simulation {
 
         // Once WE HAVE THE DEVICE we can compose simulator instance with other objects that require gpu objects such as mouse stimulation and graphs
         simulator.graphsRenderer = new GraphsRenderer(simulator.device, simulator.gpu_textureformat, simulator.gpu_extracanvases, simulator.gpu_limits,
-                                                                    simulator.cellObj, simulator.meshData, electrodesData, guiCellVarGraph, guiPECGGraph);
+                                                                    simulator.cellObj, simulator.meshData, electrodesData, guiCellVarGraph, guiPECGGraph, ensightWriter instanceof EnsightWriter);
         if (simulator.mouseStimActive){
                 simulator.mouseStim = new MouseStimHandler(simulator.device, simulator.meshData, simulator.gpu_canvas, simulator.gpu_limits);
         }
@@ -652,6 +655,14 @@ class TissueSim extends Simulation {
             return;
         }
 
+        if ((this.integ.simulation_time % this.executionTimeMeasuredInterval <= this.plot_dt) && (this.integ.simulation_time > this.plot_dt)
+            && (this.integ.simulation_time % this.executionTimeMeasuredInterval > 0)){
+            // This condition was tested carefully for avoiding float representation error
+            this.executionTimeStop = performance.now();
+            console.log(`Execution time for computing ${this.executionTimeMeasuredInterval} ms is ${this.executionTimeStop - this.executionTimeStart} ms`);
+            this.executionTimeStart = performance.now();
+        }
+
         //Update Params
         this.device.queue.writeBuffer(
             this.constantsBuffer,
@@ -701,7 +712,12 @@ class TissueSim extends Simulation {
 
         // Add render pass for possible new canvases
         if (this.graphsRenderer.isActivated) {
-            this.graphsRenderer.render(commandEncoder)
+
+            var saveGraphs = false;
+            if (this.stepsCount == this.totalStepsToSave-1) {
+                saveGraphs = true;
+            }
+            this.graphsRenderer.render(commandEncoder, saveGraphs)
         }
         
         // in case the user wanted to save or debug we need to say it to the gpu
@@ -719,7 +735,7 @@ class TissueSim extends Simulation {
             const arrayBuffer = this.readSaveBuffer.getMappedRange();
 
             // Generate the wildcard string for the ensight file
-            const wildcardString = this.stepsCount.toString().padStart(this.totalStepsToSave.toString().length, '0');
+            const wildcardString = this.stepsCount.toString().padStart((this.totalStepsToSave-1).toString().length, '0');
             
             // Save dynamically
             this.ensightWriter.saveStates(arrayBuffer, wildcardString);
@@ -736,6 +752,21 @@ class TissueSim extends Simulation {
             console.log('Animation saved as: ', this.ensightWriter.animationFileName);
             console.log('Geometry saved as: ', this.ensightWriter.geometryFileName);
             console.log('States saved as: ', this.ensightWriter.statesFileName + '*.ens');
+
+
+            // We save here the pECGs, if it was activated, for now we the folder handler is an attribute of the ensight writer
+            // this is not grat coding I know but time will fix this :P. Also is always better to save binary but for now not huge amount
+            // of the data will be save here
+            // The current simulation time is simulation_time + 1 as an extra step was computed but not updated in the simulation_time attribute
+            // Take into account that this saving is triggered by the last saving of the ensight files which seems not so natural. 
+            // This makes the last saved pECG values to corredpond to the last saved Vm values in the lastly saved .ens file but the beginning
+            // cannot match as for the pECG it depends on the amount of points used for drawing the signals. We priorized that the whole depicted ECG at 
+            // this saving moment is saved, making the user responsible for correctly selecting the num of points and save start and end for having a maching
+            // simulation Vm values and pECG values. Nonetheless, both the simulation and pECG have the time info to know at what time in the simulation 
+            // that Vm was computed.
+            // Also, if we can set the num of points to be larger than the save end, in this case negative times will appear in the ECG saved file 
+            // with the default zero value used for the buffer initialization. 
+            this.graphsRenderer.pECGGraph?.saveToCSV(this.ensightWriter.folderHandler, this.integ.simulation_time+1, this.plot_dt)
         } 
 
         // We need to await for the buffer to get read
