@@ -9,7 +9,8 @@ module.exports = {
     output: {
         filename: "[name].bundle.js",
         path: path.join(__dirname, bundleOutputDir),
-        publicPath: 'public/dist/'
+        publicPath: '/static/cocoroMain/main/dist/',   //this feels not right, but it almost drove me crazy
+        // module: true
     },
     devtool: "source-map",
     resolve: {

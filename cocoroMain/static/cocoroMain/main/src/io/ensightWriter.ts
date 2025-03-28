@@ -18,12 +18,21 @@ class EnsightWriter {
     statesFileName: string;
     folderHandler: any;
 
+    maxWorkers: number = navigator.hardwareConcurrency / 2 || 4; // Limit workers to CPU cores
+    workerPool: Worker[] = [];
+    taskQueue: { states: ArrayBuffer, statesFileName: string, stateWildcard: string, folderHandler: any}[] = [];
+
     private constructor(geometryFileName: string, animationFileName: string, statesFileName: string) {
 
         this.geometryFileName = geometryFileName;
         this.animationFileName = animationFileName;
         this.statesFileName = statesFileName;
         this.folderHandler = null;
+
+        // Initialize workers (pool filled at startup)
+        for (let i = 0; i < this.maxWorkers; i++) {
+            this.workerPool.push(this.createWorker());
+        }
     }
 
     static async create(geometryFileName: string, animationFileName: string, statesFileName: string): Promise<EnsightWriter> {
@@ -101,30 +110,53 @@ class EnsightWriter {
         await writable.close();
     }
 
-    async saveStates(states: ArrayBuffer, state_wildcard:string):Promise<void> {
+    private createWorker(): Worker {
+        const worker = new Worker(new URL('./ensightWriterWorker.ts', import.meta.url), { type: 'module' });
+    
+        worker.onmessage = (event) => {
+            // This executes when a message is received from the worker
+            if (event.data.success) {
+                console.log(`File saved: ${event.data.file}`);
+            } else {
+                console.error(`Error saving file: ${event.data.message}`);
+            }
+    
+            // Mark worker as available again
+            this.workerPool.push(worker);
+    
+            // Process the next task if available
+            this.processQueue();
+        };
+    
+        return worker;
+    }
+
+    processQueue() {
+        // Method to process pending writing of states using available workers
+        while (this.taskQueue.length > 0 && this.workerPool.length > 0) {
+            const worker = this.workerPool.shift()!;
+            const task = this.taskQueue.shift()!;
+            worker.postMessage(task);
+        }
+    }
+    
+
+    saveStates(states: ArrayBuffer, state_wildcard:string) {
+        // Launches a fix number of workers for saving the states in the background and not blocking the main thread
         
         // check if folderHandler is defined
         if (this.folderHandler == null) {
             throw new Error('Folder handler not defined');
+        }else{
+            this.taskQueue.push({ 
+                states: states, 
+                statesFileName: this.statesFileName, 
+                stateWildcard: state_wildcard, 
+                folderHandler: this.folderHandler 
+            });
+            this.processQueue(); // Try processing immediately
         }
 
-        // Open output animation file. This is an ascii file
-        const fileHandler = await this.folderHandler.getFileHandle(this.statesFileName + state_wildcard + '.ens', { create: true });
-            
-        // Create a writable stream
-        const writable = await fileHandler.createWritable();
-        
-        // Write header
-        this.writeString("Ensight Model Post Process", writable);
-        this.writeString("part", writable);
-        this.writeUint(1, writable);
-        this.writeString("coordinates", writable);
-
-        // Write scalar field.
-        await writable.write(states);
-
-        // Close file.
-        await writable.close();
     }
     
 
