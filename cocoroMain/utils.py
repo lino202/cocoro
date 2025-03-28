@@ -244,7 +244,7 @@ def parseMesh(binaryData):
         quad_to_tri_filter.SetInputData(renderMesh)
         quad_to_tri_filter.Update()
         renderMesh = quad_to_tri_filter.GetOutput()
-        saveVtkPolyMesh(renderMesh, "renderMesh")
+        # saveVtkPolyMesh(renderMesh, "renderMesh")
     else:
         renderMesh = mesh
         
