@@ -11,7 +11,7 @@ import TissueSim from './main_modules/TissueSim';
 let li:LightInputsInterface = {};
 
 const visualParams = {
-    min   : -100,
+    min   : -110,
     max   : 60,
     plot_dt  : 1,     // This should be in ms if dt is in ms
 }
@@ -44,7 +44,7 @@ guiCellVarGraphContainer.appendChild(guiCellVarGraph.domElement);
 
 const cellVarVisualizationFolder = guiCellVarGraph.addFolder('Visualization');
 const paramsCellVar = {
-    min: -100,
+    min: -110,
     max: 60,
     var_name: 'vm',
     num_points: 2000,

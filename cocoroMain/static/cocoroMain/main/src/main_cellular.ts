@@ -10,7 +10,7 @@ import $ from 'jquery';
 //  Global Variables ------------
 // these variables can be changed by the user before starting the simulation
 const visualParams = {
-    min   : -100,
+    min   : -110,
     max   : 60,
     var_name: 'vm',
     num_points : 10000,
