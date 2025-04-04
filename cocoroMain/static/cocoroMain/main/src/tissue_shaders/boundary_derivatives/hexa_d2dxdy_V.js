@@ -27,7 +27,11 @@ export function hexa_d2dxdy_V(nNodes){
             diag2_dxdy = 0.0; //You can be here in the case of outer corner!! ATTENTION
         }
 
-        d2dxdy_V = (diag1_dxdy - diag2_dxdy) / (4 * pow(integ.dx,2));
+        if ((diag1_dxdy == 0.0) | (diag2_dxdy == 0.0)){
+            d2dxdy_V = 0.0;
+        }else{
+            d2dxdy_V = (diag1_dxdy - diag2_dxdy) / (4 * pow(integ.dx,2));
+        }
 
     `;
 }

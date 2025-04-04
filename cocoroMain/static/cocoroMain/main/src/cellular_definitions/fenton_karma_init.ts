@@ -16,7 +16,7 @@ export const cellModelParamsFKBR = {
     constants:{
         Cm : 1,           //units uF/cm2
         beta: 0.14,       //units 1/um as we follow openCARP
-        sigma_long: 0.12, //units in S/m but then they are scale to mS/um
+        sigma_long: 0.1195, //units in S/m but then they are scale to mS/um
         sigma_trans_2_long : 0.25,
         V_0 : -85,
         V_fi : 15,
@@ -55,7 +55,7 @@ export const cellModelParamsFKGP = {
     constants:{
         Cm : 1,           //units uF/cm2
         beta: 0.14,       //units 1/um as we follow openCARP
-        sigma_long: 0.12, //units in S/m but then they are scale to mS/um
+        sigma_long: 0.1195, //units in S/m but then they are scale to mS/um
         sigma_trans_2_long : 0.25,
         V_0 : -85,
         V_fi : 15,
@@ -94,7 +94,7 @@ export const cellModelParamsFKMBR = {
     constants:{
         Cm : 1,           //units uF/cm2
         beta: 0.14,       //units 1/um as we follow openCARP
-        sigma_long: 0.12, //units in S/m but then they are scale to mS/um
+        sigma_long: 0.1195, //units in S/m but then they are scale to mS/um
         sigma_trans_2_long : 0.25,
         V_0 : -85,
         V_fi : 15,
@@ -134,7 +134,7 @@ export const cellModelParamsFKMLR1 = {
     constants:{
         Cm : 1,           //units uF/cm2
         beta: 0.14,       //units 1/um as we follow openCARP
-        sigma_long: 0.12, //units in S/m but then they are scale to mS/um
+        sigma_long: 0.1195, //units in S/m but then they are scale to mS/um
         sigma_trans_2_long : 0.25,
         V_0 : -85,
         V_fi : 15,

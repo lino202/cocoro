@@ -11,7 +11,7 @@ import TissueSim from './main_modules/TissueSim';
 let li:LightInputsInterface = {};
 
 const visualParams = {
-    min   : -110,
+    min   : -100,
     max   : 60,
     plot_dt  : 1,     // This should be in ms if dt is in ms
 }
@@ -44,7 +44,7 @@ guiCellVarGraphContainer.appendChild(guiCellVarGraph.domElement);
 
 const cellVarVisualizationFolder = guiCellVarGraph.addFolder('Visualization');
 const paramsCellVar = {
-    min: -110,
+    min: -100,
     max: 60,
     var_name: 'vm',
     num_points: 2000,
@@ -66,9 +66,9 @@ guiPECGGraphContainer.appendChild(guiPECGGraph.domElement);
 
 const pECGVisualizationFolder = guiPECGGraph.addFolder('Visualization');
 const paramsPECG = {
-    min: -40,
-    max: 40,
-    num_points: 2000,
+    min: -70,
+    max: 70,
+    num_points: 1001,
     alpha_smoothing: 0.6
 };
 pECGVisualizationFolder.add(paramsPECG, 'min');

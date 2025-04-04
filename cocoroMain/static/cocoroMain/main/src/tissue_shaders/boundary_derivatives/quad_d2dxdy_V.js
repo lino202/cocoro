@@ -30,6 +30,10 @@ export function quad_d2dxdy_V(nNodes){
             diag2 = 0.0; //You can be here in the case of outer corner!! ATTENTION
         }
 
-        d2dxdy_V = (diag1 - diag2) / (4 * pow(integ.dx,2));
+        if ((diag1 == 0.0) | (diag2 == 0.0)){
+            d2dxdy_V = 0.0;
+        }else{
+            d2dxdy_V = (diag1 - diag2) / (4 * pow(integ.dx,2));
+        }
     `;
 }
