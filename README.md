@@ -1,57 +1,80 @@
 # Cocoro
 
-Simulations in the GPU throught the web.
+Cocoro enables fully GPU-resident fast cardiac electrophysiological simulations on the Web through the modern WebGPU standard. 
 
+## Features:
 
-# Usage
-
-For now it is working in chrome on windows only and in my case I have to set msi pc dragon center to use the discrete gpu
+- Tissue and cellular cardiac electrophysiology simulator
+- Monodomain model solver
+- Finite Difference Method
+- Fully GPU-based
+- WebGPU-based web application
+- Interactive: click-based stimulation, on run time modification of cellular model constants, visualization and integration parameters.
+- Automatic computation and rendering of simulation, pseudo-ECGs, cellular state variables
+- Ensight binary results for post-processing and visualization on Paraview
+- Support 1D (lines), 2D (quads) and 3D (hexahedral) domains.
 
 # Install 
 
+Clone the repo locally on your machine or the machine you will use as server
+
    ```sh
-   cd /parent/folder
+   cd [/any/parent/folder]
    git clone https://github.com/lino202/cocoro
+   ```
+
+A .yml file is provided for generating a conda environment. You can use it or not. If not used you will have to download all dependencies
+
+   ```sh
    cd cocoro
    cd cocoroMain/static/cocoroMain/main/
    npm install
-   npm run prod
+   npm run dev
    ```
 
-## Load server
+Load the server
 
    ```sh
    cd /path/cocoro
    python manage.py runserver 
    ```
 
-For now the page has to be http://localhost:8000/index and need to be open in a newer Chrome version as this browser supports webGPU
+If deployed locally and once the server is loaded you can visit 
+- http://localhost:8000/upload for loading the mesh and electrodes positions
+- http://localhost:8000/tissue for tissue simulations
+- http://localhost:8000/cellular for cellular simulations
 
+# Notes
 
-## Typescript
-
-The core of the software is written in Typescript. These code calls the shaders or kernels in WGSL code. All this has to be compiled in the following manner
-
-Go to where the webpack and package.json are which define how the compilation happens for ts files
+- Development was mainly performed in Chrome on Windows, but WebGPU support should be arriving to different WebBrowsers under different operative systems (see [WebGPU Implementation Status](https://github.com/gpuweb/gpuweb/wiki/Implementation-Status)). 
+- Software is written in Python (Django), Typescript, Javascript and WebGPU shading language (WGSL). Django was selected for deploying the entire web application in order to take advantage of python software for mesh processing among others. Typescript is used for hard typed and object oriented development, the typescript code wraps the Javascript one which enabled highlighting the WGSL shader code.
+- The main source code of the simulator is under [cocoro/cocoroMain/static/cocoroMain/main/src/](https://github.com/lino202/cocoro/tree/main/cocoroMain/static/cocoroMain/main/src). Any modification of the code here should be recompiled:
 
    ```sh
-   cd /path/cocoro/cocoroMain/static/cocoroMain/main/src/
-   npm run prod
+   cd [any/path]/cocoro/cocoroMain/static/cocoroMain/main/src/
+   npm run dev
    ```
 
-
-We can use the types of for web gpu but the compilation with npm run prod gives erros and the code cannot be compiled. So the warnings regarding updates of webgpu cannot be solved unles new types are used 
+- We use webpack, so take a look at webpack.config.js and tsconfig.json. Moreover, dependencies at the typescript level are manage with npm, so check the package.json.
+- WebGPU is evolving rapidly so warnings regarding API modifications can appear on the browser console. You will need to update the src typescript code, as we use webgpu types, you will need to update them in order to be able or recompile without errors, do the following under cocoro/cocoroMain/static/cocoroMain/main/src/: 
 
   ```sh
     npm i @webgpu/types@0.1.15     # load specific types
     npm i @webgpu/types            # load lastest types
    ```
 
-Those should be used where the packaje.json is...
+- Currently, this code is under development [Development](#development)
 
-## Examples
 
-Examples are too heavy for being here, so see 
+# Implementation
 
-[Example Meshes](https://unizares-my.sharepoint.com/:f:/g/personal/rrosales_unizar_es/Et6vMDqjG_VNo4-x-rj9d7MBukCm4th3GA7qA6Zntg-nyg?e=pCeomb)
+A thorough description of the implementation and dynamics of this application can be found in our publication [Yet to come]().
+
+# Development
+
+The idea behind this project is to create an open-source, fast but simple, portable GPU-based cardiac simulator for the community to use. It is currently in a proof-of-concept stage so, there are a lot of things to do (please see TODOs through all the source code). In this context, pull-requests, collaborations, issue reports, critics, advice, everything! is welcome :D.
+
+# Examples
+
+Examples are too heavy for being here, so see [Examples](https://unizares-my.sharepoint.com/:f:/g/personal/rrosales_unizar_es/Et6vMDqjG_VNo4-x-rj9d7MBukCm4th3GA7qA6Zntg-nyg?e=pCeomb).
 
