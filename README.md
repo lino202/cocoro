@@ -76,5 +76,5 @@ The idea behind this project is to create an open-source, fast but simple, porta
 
 # Examples
 
-Examples are too heavy for being here, so see [Examples](https://unizares-my.sharepoint.com/:f:/g/personal/rrosales_unizar_es/Et6vMDqjG_VNo4-x-rj9d7MBd_7lqlWdXl67HseZ7toHFg?e=gehZ9a).
+Examples are too heavy for being here, so see [Examples](https://unizares-my.sharepoint.com/:f:/g/personal/rrosales_unizar_es/Et6vMDqjG_VNo4-x-rj9d7MBd_7lqlWdXl67HseZ7toHFg).
 
